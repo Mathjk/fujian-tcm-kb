@@ -1,0 +1,95 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="知识图谱" desc="草药与病症的关联网络">
+  <div class="graph-wrap">
+    <div id="graph"></div>
+    <div class="graph-tools">
+      <div class="panel">
+        <input id="gq" type="search" placeholder="定位节点…" />
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:5px">
+          <label><input type="checkbox" id="showH" checked /> 草药节点</label>
+          <label><input type="checkbox" id="showD" checked /> 病症节点</label>
+          <label><input type="checkbox" id="relTreat" checked /> 「组方治疗」边</label>
+          <label><input type="checkbox" id="relIndic" checked /> 「主治」边</label>
+        </div>
+      </div>
+      <div class="panel graph-legend">
+        <span><i class="dot" style="background:#3f5d46"></i>草药</span>
+        <span><i class="dot" style="background:#b23a24"></i>病症</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import * as echarts from 'echarts';
+    const BASE = document.querySelector('meta[name=base]').getAttribute('content');
+    const el = document.getElementById('graph');
+    const chart = echarts.init(el);
+    chart.showLoading({ text: '图谱加载中…', color: '#b23a24', textColor: '#57503f', maskColor: 'rgba(246,241,229,.7)' });
+
+    let DATA = null;
+    const nodeById = {};
+
+    function rebuild() {
+      const showH = document.getElementById('showH').checked;
+      const showD = document.getElementById('showD').checked;
+      const rT = document.getElementById('relTreat').checked;
+      const rI = document.getElementById('relIndic').checked;
+      const keep = n => (n.type === 'herb' ? showH : showD);
+      const nodes = DATA.nodes.filter(keep).map(n => ({
+        id: n.id, name: n.name, slug: n.slug, type: n.type,
+        category: n.type === 'herb' ? 0 : 1,
+        symbolSize: Math.min(26, 7 + Math.sqrt(n.deg || 1) * 2.4),
+        itemStyle: { color: n.type === 'herb' ? '#3f5d46' : '#b23a24', borderColor: '#f6f1e5', borderWidth: 1.5 },
+        label: { show: (n.deg || 0) > 14, fontSize: 11, color: '#2c2820' },
+      }));
+      const ids = new Set(nodes.map(n => n.id));
+      const links = DATA.links.filter(l =>
+        ids.has(l.source) && ids.has(l.target) &&
+        (l.rel === '组方治疗' ? rT : rI));
+      chart.setOption({
+        tooltip: {
+          formatter: p => p.dataType === 'node'
+            ? `${p.data.name}<br/><span style="color:#8a7f66;font-size:12px">${p.data.type === 'herb' ? '草药' : '病症'} · ${p.data.deg ?? 0} 关联</span>`
+            : `${p.data.rel}`,
+        },
+        series: [{
+          type: 'graph', layout: 'force', roam: true, draggable: true,
+          nodes, links,
+          force: { repulsion: 60, edgeLength: [30, 90], gravity: 0.08, friction: 0.25 },
+          lineStyle: { color: '#c9ba9c', width: 1, opacity: .55, curveness: 0.08 },
+          emphasis: { focus: 'adjacency', lineStyle: { color: '#b23a24', width: 2, opacity: .9 }, label: { show: true } },
+          scaleLimit: { min: 0.15, max: 8 },
+        }],
+      }, { replaceMerge: ['series'] });
+    }
+
+    fetch(BASE + '/data/graph.json').then(r => r.json()).then(g => {
+      // degree
+      const deg = {};
+      for (const l of g.links) { deg[l.source] = (deg[l.source] || 0) + 1; deg[l.target] = (deg[l.target] || 0) + 1; }
+      g.nodes.forEach(n => { n.deg = deg[n.id] || 0; nodeById[n.name] = n; });
+      DATA = g;
+      chart.hideLoading();
+      rebuild();
+    });
+
+    ['showH', 'showD', 'relTreat', 'relIndic'].forEach(id =>
+      document.getElementById(id).addEventListener('change', rebuild));
+
+    document.getElementById('gq').addEventListener('input', e => {
+      const v = e.target.value.trim();
+      if (!v || !DATA) return;
+      const n = DATA.nodes.find(n => n.name.includes(v));
+      if (n) chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: n.name });
+    });
+
+    chart.on('click', p => {
+      if (p.dataType === 'node' && p.data.slug) {
+        location.href = BASE + (p.data.type === 'herb' ? '/herbs/' : '/diseases/') + p.data.slug;
+      }
+    });
+    window.addEventListener('resize', () => chart.resize());
+  </script>
+</Base>

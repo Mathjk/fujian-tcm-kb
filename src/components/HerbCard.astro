@@ -1,0 +1,21 @@
+---
+import { u } from '../utils/url';
+interface Props { herb: any; }
+const { herb } = Astro.props;
+const img = herb.images?.[0]?.file;
+const ex = (herb.sections?.find((s: any) => ['功能主治','功用','性味功能'].includes(s.label))
+         ?? herb.sections?.[0]);
+const exText = ex ? Object.values(ex.texts)[0] as string : '';
+---
+<a class="card herb-card" href={u('/herbs/' + herb.slug)}>
+  <div class="pic">
+    {img
+      ? <img src={u('img/' + img)} alt={herb.name} loading="lazy" />
+      : <div class="noimg">草</div>}
+  </div>
+  <div class="bd">
+    <div class="nm">{herb.name}</div>
+    {herb.category && <div class="cat">{herb.category}</div>}
+    <div class="ex">{exText.slice(0, 60)}</div>
+  </div>
+</a>

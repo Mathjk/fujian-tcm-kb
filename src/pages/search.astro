@@ -1,0 +1,41 @@
+---
+import Base from '../layouts/Base.astro';
+import { u } from '../utils/url';
+---
+<Base title="检索" desc="检索草药、病症">
+  <div class="wrap">
+    <div class="search-hero">
+      <input id="q" type="search" placeholder="输入药名、别名、拉丁名或病症…" autofocus />
+    </div>
+    <div id="result" style="max-width:760px;margin:0 auto 60px"></div>
+  </div>
+  <script>
+    const BASE = document.querySelector('meta[name=base]').getAttribute('content');
+    const q = document.getElementById('q'), box = document.getElementById('result');
+    let idx = null;
+    fetch(BASE + '/data/search.json').then(r => r.json()).then(d => { idx = d; });
+
+    const TMAP = { h: ['草药', 'pine', '/herbs/'], d: ['病症', 'red', '/diseases/'] };
+    const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    function render() {
+      const v = q.value.trim();
+      if (!v || !idx) { box.innerHTML = ''; return; }
+      const hits = idx.filter(e => e.n.includes(v) || (e.k && e.k.includes(v))).slice(0, 80);
+      if (!hits.length) { box.innerHTML = '<div class="empty">查无此条</div>'; return; }
+      const groups = {};
+      hits.forEach(h => (groups[h.t] ??= []).push(h));
+      box.innerHTML = Object.entries(groups).map(([t, items]) => {
+        const [label, cls, path] = TMAP[t];
+        return `<div class="sr-group"><h3>${label}（${items.length}）</h3>` +
+          items.map(h =>
+            `<a class="sr-item" href="${BASE}${path}${h.s}"><span class="t chip ${cls}">${label}</span><b>${esc(h.n)}</b><span class="k">${esc(h.k || '')}</span></a>`
+          ).join('') + '</div>';
+      }).join('');
+    }
+    q.addEventListener('input', render);
+    // deep link ?q=
+    const init = new URLSearchParams(location.search).get('q');
+    if (init) { q.value = init; }
+    const iv = setInterval(() => { if (idx) { clearInterval(iv); render(); } }, 120);
+  </script>
+</Base>

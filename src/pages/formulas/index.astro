@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u, BOOK_SHORT } from '../../utils/url';
+import diseases from '../../data/diseases.json';
+import formulas from '../../data/formulas.json';
+import meta from '../../data/meta.json';
+
+const byDisease = new Map<string, any[]>();
+for (const f of formulas as any[]) {
+  const k = f.disease || '其他';
+  if (!byDisease.has(k)) byDisease.set(k, []);
+  byDisease.get(k)!.push(f);
+}
+const dslug = Object.fromEntries(diseases.map((d: any) => [d.name, d.slug]));
+const rows = [...byDisease.entries()].sort((a, b) => b[1].length - a[1].length);
+const books = [...new Set(formulas.map((f: any) => f.book))];
+---
+<Base title="方剂" desc="各书验方按病症汇总">
+  <div class="wrap">
+    <h1 class="page-title">方剂总目</h1>
+    <p class="page-desc">共 {meta.formulas} 首 · 按主治病症归并 · 点击入病症页详览</p>
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="搜病症 / 药味…" />
+      <select id="bk"><option value="">全部出处</option>{books.map(b => <option value={b}>{BOOK_SHORT[b] ?? b}</option>)}</select>
+      <span class="count" id="count"></span>
+    </div>
+    <div id="list">
+      {rows.map(([dn, fs]) => (
+        <div class="cat-group" data-name={dn}>
+          <h3>
+            {dslug[dn]
+              ? <a href={u('/diseases/' + dslug[dn])}>{dn}</a>
+              : dn}
+            <span style="color:var(--ink-3);font-weight:400;font-size:13px">（{fs.length} 方）</span>
+          </h3>
+          <div class="pill-list">
+            {fs.map((f: any, i: number) => (
+              dslug[dn]
+                ? <a class="pill" href={u('/diseases/' + dslug[dn] + '#' + f.id)}
+                     data-books={f.book}
+                     data-comp={f.composition.map((c: any) => c.herb).join(' ')}>
+                    方 {i + 1}<span class="c">{BOOK_SHORT[f.book] ?? ''}</span>
+                  </a>
+                : <span class="pill" data-books={f.book}
+                        data-comp={f.composition.map((c: any) => c.herb).join(' ')}>
+                    方 {i + 1}<span class="c">{BOOK_SHORT[f.book] ?? ''}</span>
+                  </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+  <script>
+    const q = document.getElementById('q'), bk = document.getElementById('bk'),
+          count = document.getElementById('count');
+    function apply() {
+      const v = q.value.trim(), b = bk.value;
+      let total = 0;
+      document.querySelectorAll('#list .cat-group').forEach(g => {
+        let any = false;
+        const nameHit = !v || g.dataset.name.includes(v);
+        g.querySelectorAll('.pill').forEach(p => {
+          const show = nameHit || (v && p.dataset.comp.includes(v));
+          const showB = !b || p.dataset.books === b;
+          const on = show && showB && (v ? (nameHit || p.dataset.comp.includes(v)) : true);
+          p.style.display = on ? '' : 'none';
+          if (on) { any = true; total++; }
+        });
+        g.style.display = any ? '' : 'none';
+      });
+      count.textContent = `${total} 方`;
+    }
+    [q, bk].forEach(el => el.addEventListener('input', apply));
+    apply();
+  </script>
+</Base>

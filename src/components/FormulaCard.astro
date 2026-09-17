@@ -1,0 +1,29 @@
+---
+import { u, BOOK_SHORT } from '../utils/url';
+interface Props { f: any; num?: number; }
+const { f, num } = Astro.props;
+---
+<div class="card fx-card" id={f.id}>
+  <div class="fx-head">
+    <span class="fx-name">{num != null ? `方 ${'①②③④⑤⑥⑦⑧⑨⑩'[num] ?? num + 1}` : (f.disease ? `${f.disease}方` : '验方')}</span>
+    {f.book && <span class="fx-src">{BOOK_SHORT[f.book] ?? f.book}</span>}
+    {f.source && <span class="fx-src">· {f.source}</span>}
+  </div>
+  {f.composition?.length > 0 && (
+    <div class="fx-row">
+      <span class="label-tag">组成</span>
+      <div class="fx-comp">
+        {f.composition.map((c: any) => (
+          c.herb_id
+            ? <a class="fx-ing" href={u('/herbs/' + c.slug)}>{c.herb}<span class="dose">{c.dose}</span></a>
+            : <span class="fx-ing no" title="未收录为词条">{c.herb}<span class="dose">{c.dose}</span></span>
+        ))}
+      </div>
+    </div>
+  )}
+  {f.prescription && <div class="fx-row"><span class="label-tag">处方</span><span>{f.prescription}</span></div>}
+  {f.preparation && <div class="fx-row"><span class="label-tag">制法</span><span>{f.preparation}</span></div>}
+  {f.usage && <div class="fx-row"><span class="label-tag">用法</span><span>{f.usage}</span></div>}
+  {f.efficacy && <div class="fx-row"><span class="label-tag">疗效</span><span>{f.efficacy}</span></div>}
+  {f.note && <div class="fx-row"><span class="label-tag">备注</span><span>{f.note}</span></div>}
+</div>

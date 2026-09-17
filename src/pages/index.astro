@@ -1,0 +1,57 @@
+---
+import Base from '../layouts/Base.astro';
+import { u } from '../utils/url';
+import meta from '../data/meta.json';
+import herbs from '../data/herbs.json';
+
+const withImg = herbs.filter((h: any) => h.images?.length);
+const featured = withImg.filter((_: any, i: number) => i % Math.floor(withImg.length / 12) === 0).slice(0, 12);
+---
+<Base>
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-vert">闽本草</div>
+      <div class="hero-main">
+        <div class="hero-sub">福建中草药知识库</div>
+        <p class="hero-quote">
+          汇辑《福建中草药》《常用中草药彩色图谱》《中草药速认图集》《福建中草药处方》《中草药方选》等六册文献，
+          去繁就简，整理为草药、病症、方剂三类条目，并以图谱贯之，备览闽地本草之全貌。
+        </p>
+        <div class="stats">
+          <div class="stat"><b>{meta.herbs}</b><span>草药</span></div>
+          <div class="stat"><b>{meta.diseases}</b><span>病症</span></div>
+          <div class="stat"><b>{meta.formulas}</b><span>方剂</span></div>
+          <div class="stat"><b>{meta.edges}</b><span>关联</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="entry-grid">
+      <a class="card entry-card" data-mark="草" href={u('/herbs')}>
+        <h3>草药图谱</h3>
+        <p>性味归经、形态生境、别名验方，每味药附原书手绘图版或实拍照片。</p>
+        <span class="go">览 {meta.herbs} 味 →</span>
+      </a>
+      <a class="card entry-card" data-mark="症" href={u('/diseases')}>
+        <h3>病症索引</h3>
+        <p>按科别检索病症，每种病症汇集各书所载验方，组成剂量一目了然。</p>
+        <span class="go">览 {meta.diseases} 症 →</span>
+      </a>
+      <a class="card entry-card" data-mark="图" href={u('/graph')}>
+        <h3>知识图谱</h3>
+        <p>草药与病症织成网络：某药治某症、某症用某方，循线可穷其牵连。</p>
+        <span class="go">观 {meta.edges} 缘 →</span>
+      </a>
+    </div>
+
+    <div class="divider-orn" style="margin-top:60px">草药一隅</div>
+    <div class="strip">
+      {featured.map((h: any) => (
+        <a href={u('/herbs/' + h.slug)}>
+          <img src={u('img/' + h.images[0].file)} alt={h.name} loading="lazy" />
+          <div class="n">{h.name}</div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Base>

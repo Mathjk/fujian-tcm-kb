@@ -1,0 +1,52 @@
+---
+import '../styles/global.css';
+import { u, BASE } from '../utils/url';
+
+interface Props { title?: string; desc?: string; }
+const { title = '闽本草', desc = '福建中草药知识库' } = Astro.props;
+const fullTitle = title === '闽本草' ? '闽本草 · 福建中草药知识库' : `${title} · 闽本草`;
+const path = Astro.url.pathname;
+const nav = [
+  ['草药', 'herbs'],
+  ['病症', 'diseases'],
+  ['方剂', 'formulas'],
+  ['图谱', 'graph'],
+  ['检索', 'search'],
+  ['关于', 'about'],
+];
+---
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{fullTitle}</title>
+  <meta name="description" content={desc} />
+  <meta name="base" content={BASE} />
+</head>
+<body>
+  <header class="site-head">
+    <div class="wrap">
+      <a class="brand" href={u('/')}>
+        <span class="seal">闽</span>
+        <span>
+          <div class="brand-name">闽本草</div>
+          <div class="brand-sub">福建中草药知识库</div>
+        </span>
+      </a>
+      <nav class="nav">
+        {nav.map(([label, seg]) => (
+          <a href={u('/' + seg)} class={path.includes('/' + seg) ? 'active' : ''}>{label}</a>
+        ))}
+      </nav>
+    </div>
+  </header>
+  <main><slot /></main>
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot-seal">闽本草</div>
+      <div>本站内容整理自二十世纪福建地区出版的中草药文献，仅供学习与研究参考，不构成医疗建议。所载方剂请勿自行施用，用药请遵医嘱。</div>
+    </div>
+  </footer>
+</body>
+</html>

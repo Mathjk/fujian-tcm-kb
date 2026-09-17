@@ -1,0 +1,50 @@
+---
+import Base from '../../layouts/Base.astro';
+import FormulaCard from '../../components/FormulaCard.astro';
+import { u } from '../../utils/url';
+import diseases from '../../data/diseases.json';
+import formulas from '../../data/formulas.json';
+import herbs from '../../data/herbs.json';
+
+export function getStaticPaths() {
+  return diseases.map((d: any) => ({ params: { slug: d.slug }, props: { d } }));
+}
+const { d } = Astro.props;
+const myFormulas = (d.formulas ?? [])
+  .map((id: string) => formulas.find((f: any) => f.id === id))
+  .filter(Boolean)
+  .sort((a: any, b: any) => a.index - b.index);
+// herbs used across this disease's formulas
+const herbIds = [...new Set(myFormulas.flatMap((f: any) => f.composition.map((c: any) => c.slug).filter(Boolean)))];
+const hslug = Object.fromEntries(herbs.map((h: any) => [h.slug, h]));
+const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
+---
+<Base title={d.name} desc={`${d.category} · 验方 ${myFormulas.length} 首`}>
+  <div class="wrap">
+    <h1 class="page-title">{d.name}</h1>
+    <div class="d-meta" style="margin:-14px 0 30px">
+      <span class="chip red">{d.category}</span>
+      <span class="chip">验方 {myFormulas.length} 首</span>
+      {relHerbs.length > 0 && <span class="chip pine">涉药 {relHerbs.length} 味</span>}
+    </div>
+
+    {relHerbs.length > 0 && (
+      <section class="sec" style="margin-top:0">
+        <div class="sec-h">常用草药</div>
+        <div class="sec-bd rel-list">
+          {relHerbs.slice(0, 40).map((h: any) => <a class="pill" href={u('/herbs/' + h.slug)}>{h.name}</a>)}
+        </div>
+      </section>
+    )}
+
+    <section class="sec">
+      <div class="sec-h">验方</div>
+      <div class="sec-bd" style="margin-top:16px">
+        {myFormulas.map((f: any, i: number) => <FormulaCard f={f} num={i} />)}
+        {myFormulas.length === 0 && <div class="empty">暂无方剂</div>}
+      </div>
+    </section>
+
+    <div style="margin:50px 0"><a href={u('/diseases')}>← 返回病症索引</a></div>
+  </div>
+</Base>

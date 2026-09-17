@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import HerbCard from '../../components/HerbCard.astro';
+import herbs from '../../data/herbs.json';
+import meta from '../../data/meta.json';
+
+const cats = [...new Set(herbs.map((h: any) => h.category).filter(Boolean))].sort();
+const books = [...new Set(herbs.flatMap((h: any) => h.books))];
+const BOOK_LABEL: Record<string, string> = {
+  'fujian-zhongcaoyao-vol1': '福建中草药·一', 'caise-tupu-1992': '彩色图谱',
+  'suren-tuji-2010': '速认图集', 'fangxuan-vol3-1986': '方选·三',
+  'fangxuan-2': '方选·二', 'fujian-chufang-1971': '福建处方',
+};
+// compact index for client filtering
+const idx = herbs.map((h: any) => ({
+  s: h.slug, n: h.name, a: h.aliases.join(' '), c: h.category, b: h.books.join(','),
+  i: h.images?.[0]?.file ?? '',
+  e: (Object.values(h.sections?.find((x: any) => ['功能主治','功用','性味功能'].includes(x.label))?.texts ?? {})[0] as string ?? '').slice(0, 60),
+}));
+---
+<Base title="草药" desc="福建中草药八百种，可按类别、出处检索">
+  <div class="wrap">
+    <h1 class="page-title">草药图谱</h1>
+    <p class="page-desc">共 {meta.herbs} 味 · 收录别名、性味、功效主治与图版影像</p>
+
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="搜药名 / 别名…" />
+      <select id="cat"><option value="">全部类别</option>{cats.map(c => <option value={c}>{c}</option>)}</select>
+      <select id="bk"><option value="">全部出处</option>{books.map(b => <option value={b}>{BOOK_LABEL[b] ?? b}</option>)}</select>
+      <label class="chip"><input type="checkbox" id="hasimg" /> 有图</label>
+      <span class="count" id="count"></span>
+    </div>
+
+    <div class="herb-grid" id="grid"></div>
+    <div class="empty" id="empty" style="display:none">无相应草药</div>
+    <div style="text-align:center;margin:30px 0"><button id="more" class="chip" style="cursor:pointer;font-size:14px;padding:8px 22px;display:none">展开更多</button></div>
+  </div>
+
+  <script define:vars={{ idx }}>
+    const data = idx;
+    const BASE = document.querySelector('meta[name=base]')?.getAttribute('content') ?? '';
+    const grid = document.getElementById('grid'), empty = document.getElementById('empty'),
+          count = document.getElementById('count'), more = document.getElementById('more');
+    const q = document.getElementById('q'), cat = document.getElementById('cat'),
+          bk = document.getElementById('bk'), hasimg = document.getElementById('hasimg');
+    const PAGE = 60;
+    let filtered = data, shown = 0;
+
+    const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    function card(h) {
+      const pic = h.i ? `<div class="pic"><img src="${BASE}/img/${h.i}" loading="lazy" alt="${esc(h.n)}"></div>`
+                      : `<div class="pic"><div class="noimg">草</div></div>`;
+      return `<a class="card herb-card" href="${BASE}/herbs/${h.s}">${pic}
+        <div class="bd"><div class="nm">${esc(h.n)}</div>
+        ${h.c ? `<div class="cat">${esc(h.c)}</div>` : ''}
+        <div class="ex">${esc(h.e)}</div></div></a>`;
+    }
+    function render() {
+      const batch = filtered.slice(shown, shown + PAGE);
+      grid.insertAdjacentHTML('beforeend', batch.map(card).join(''));
+      shown += batch.length;
+      more.style.display = shown < filtered.length ? '' : 'none';
+      empty.style.display = filtered.length ? 'none' : '';
+      count.textContent = `${filtered.length} 味`;
+    }
+    function apply() {
+      const v = q.value.trim(), c = cat.value, b = bk.value, hi = hasimg.checked;
+      filtered = data.filter(h =>
+        (!v || h.n.includes(v) || h.a.includes(v)) &&
+        (!c || h.c === c) && (!b || h.b.split(',').includes(b)) && (!hi || h.i));
+      shown = 0; grid.innerHTML = ''; render();
+    }
+    [q, cat, bk, hasimg].forEach(el => el.addEventListener('input', apply));
+    more.addEventListener('click', render);
+    apply();
+  </script>
+</Base>

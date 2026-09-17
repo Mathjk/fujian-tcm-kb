@@ -1,0 +1,100 @@
+---
+import Base from '../../layouts/Base.astro';
+import FormulaCard from '../../components/FormulaCard.astro';
+import { u, BOOK_SHORT } from '../../utils/url';
+import herbs from '../../data/herbs.json';
+import formulas from '../../data/formulas.json';
+import diseases from '../../data/diseases.json';
+
+export function getStaticPaths() {
+  return herbs.map((h: any) => ({ params: { slug: h.slug }, props: { herb: h } }));
+}
+const { herb } = Astro.props;
+const myFormulas = (herb.formulas ?? []).map((id: string) => formulas.find((f: any) => f.id === id)).filter(Boolean);
+const dslug = Object.fromEntries(diseases.map((d: any) => [d.name, d.slug]));
+const myDiseases = (herb.diseases ?? []).map((n: string) => ({ name: n, slug: dslug[n] })).filter((d: any) => d.slug);
+const bookCount = herb.books?.length ?? 0;
+---
+<Base title={herb.name} desc={[herb.latin, herb.category].filter(Boolean).join(' · ')}>
+  <div class="wrap">
+    <div class="detail-head">
+      <div>
+        {herb.images?.length ? (
+          <>
+            <div class="detail-img">
+              <img id="main-img" src={u('img/' + herb.images[0].file)} alt={herb.name} />
+              <div class="cap">{BOOK_SHORT[herb.images[0].book] ?? herb.images[0].book} · 图版</div>
+            </div>
+            {herb.images.length > 1 && (
+              <div class="gallery-thumbs">
+                {herb.images.map((im: any, i: number) => (
+                  <img src={u('img/' + im.file)} data-full={u('img/' + im.file)}
+                       data-cap={BOOK_SHORT[im.book] ?? im.book} class={i === 0 ? 'on' : ''} loading="lazy" />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div class="detail-img" style="aspect-ratio:4/3;display:grid;place-items:center">
+            <span style="font-family:var(--kai);font-size:64px;color:var(--line-2)">草</span>
+          </div>
+        )}
+      </div>
+      <div>
+        <h1 class="d-name">{herb.name}</h1>
+        {herb.latin && <div class="d-latin">{herb.latin}</div>}
+        <div class="d-meta">
+          {herb.family && <span class="chip pine">{herb.family}</span>}
+          {herb.category && <span class="chip gold">{herb.category}</span>}
+          {bookCount > 1 && <span class="chip">{bookCount} 书互见</span>}
+        </div>
+        {herb.aliases?.length > 0 && (
+          <div class="d-aliases"><b>别名</b>{herb.aliases.join('、')}</div>
+        )}
+        {myDiseases.length > 0 && (
+          <div class="sec">
+            <div class="sec-h">主治病症</div>
+            <div class="sec-bd rel-list">
+              {myDiseases.map((d: any) => <a class="pill" href={u('/diseases/' + d.slug)}>{d.name}</a>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {herb.sections.map((s: any) => (
+      <section class="sec">
+        <div class="sec-h">{s.label}</div>
+        <div class="sec-bd">
+          {Object.entries(s.texts).map(([bk, txt]: any) => (
+            <p>{Object.keys(s.texts).length > 1 && <span class="bk">{BOOK_SHORT[bk] ?? bk}</span>}{txt}</p>
+          ))}
+        </div>
+      </section>
+    ))}
+
+    {myFormulas.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">相关方剂（{myFormulas.length}）</div>
+        <div class="sec-bd">
+          {myFormulas.map((f: any, i: number) => <FormulaCard f={f} num={i} />)}
+        </div>
+      </section>
+    )}
+
+    <div style="margin:50px 0"><a href={u('/herbs')}>← 返回草药图谱</a></div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.gallery-thumbs img').forEach(t => {
+      t.addEventListener('click', () => {
+        const main = document.getElementById('main-img');
+        main.src = t.dataset.full;
+        const cap = document.querySelector('.detail-img .cap');
+        if (cap) cap.textContent = t.dataset.cap + ' · 图版';
+        document.querySelectorAll('.gallery-thumbs img').forEach(x => x.classList.remove('on'));
+        t.classList.add('on');
+      });
+    });
+  </script>
+</Base>

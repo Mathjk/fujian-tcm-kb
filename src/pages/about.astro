@@ -1,0 +1,44 @@
+---
+import Base from '../layouts/Base.astro';
+import meta from '../data/meta.json';
+---
+<Base title="关于">
+  <div class="wrap" style="max-width:760px">
+    <h1 class="page-title">关于本站</h1>
+    <p class="page-desc">闽本草 · 福建中草药知识库</p>
+
+    <section class="sec">
+      <div class="sec-h">缘起</div>
+      <div class="sec-bd">
+        <p>本站将六册二十世纪福建地区中草药文献整理为结构化知识库：草药条目取其形态、生境、性味、功效主治与验方；处方类文献按病症归并，拆解方中药味，使「药—方—症」三者互相勾连，可沿图谱脉络往复查考。</p>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h">文献来源</div>
+      <div class="sec-bd">
+        <p>· 《福建中草药·第一册》福建省医药研究所编</p>
+        <p>· 《常用中草药彩色图谱》徐国钧主编，1992</p>
+        <p>· 《中草药速认图集》天宇著，2010</p>
+        <p>· 《福建中草药处方》福建省医药研究所编，1971</p>
+        <p>· 《中草药方选·第三集》福建省中医药研究所编，1986</p>
+        <p>· 《福建中草药方选2》</p>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h">规模</div>
+      <div class="sec-bd">
+        <p>草药 {meta.herbs} 味 · 病症 {meta.diseases} 种 · 方剂 {meta.formulas} 首 · 药症关联 {meta.edges} 条 · 图版影像 {meta.images} 幅。</p>
+        <p>全部内容由扫描影像经 OCR 识别、规则解析、跨书归并而得；文字或有讹误，条目如有舛错，以原书为准。</p>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-h">声明</div>
+      <div class="sec-bd">
+        <p>本站所载内容均为历史文献整理，仅供学习与研究参考，<b>不构成任何医疗建议</b>。文献成书年代久远，所载用法用量、疗效记述未经现代医学验证，切勿照方自用；如有疾患，请就医遵嘱。</p>
+      </div>
+    </section>
+  </div>
+</Base>

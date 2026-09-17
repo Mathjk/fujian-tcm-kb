@@ -1,0 +1,57 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../utils/url';
+import diseases from '../../data/diseases.json';
+import meta from '../../data/meta.json';
+
+const groups = new Map<string, any[]>();
+for (const d of diseases as any[]) {
+  const c = d.category || '其他';
+  if (!groups.has(c)) groups.set(c, []);
+  groups.get(c)!.push(d);
+}
+// keep book-ish order: put numbered categories first (they start with 一、二、…), then others
+const ordered = [...groups.entries()].sort((a, b) => {
+  const ra = /^[一二三四五六七八九十]+、/.test(a[0]) ? 0 : 1;
+  const rb = /^[一二三四五六七八九十]+、/.test(b[0]) ? 0 : 1;
+  return ra - rb || a[0].localeCompare(b[0], 'zh');
+});
+---
+<Base title="病症" desc="按科别索引病症与对应验方">
+  <div class="wrap">
+    <h1 class="page-title">病症索引</h1>
+    <p class="page-desc">共 {meta.diseases} 症 · {meta.formulas} 首验方 · 依原书科别归类</p>
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="搜病症…" />
+    </div>
+    <div id="groups">
+      {ordered.map(([cat, ds]) => (
+        <div class="cat-group" data-cat={cat}>
+          <h3>{cat} <span style="color:var(--ink-3);font-weight:400;font-size:13px">（{ds.length}）</span></h3>
+          <div class="pill-list">
+            {ds.map((d: any) => (
+              <a class="pill" href={u('/diseases/' + d.slug)} data-name={d.name}>
+                {d.name}<span class="c">{d.formulas.length}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+  <script>
+    const q = document.getElementById('q');
+    q.addEventListener('input', () => {
+      const v = q.value.trim();
+      document.querySelectorAll('.cat-group').forEach(g => {
+        let any = false;
+        g.querySelectorAll('.pill').forEach(p => {
+          const show = !v || p.dataset.name.includes(v);
+          p.style.display = show ? '' : 'none';
+          if (show) any = true;
+        });
+        g.style.display = any ? '' : 'none';
+      });
+    });
+  </script>
+</Base>
