@@ -34,8 +34,12 @@ def load_pages(book):
         scores = res.get("rec_scores", [])
         lines = [t.strip() for t, s in zip(texts, scores) if s >= 0.5 and t.strip()]
         pnum = None
-        if lines and PAGE_NUM_RE.match(lines[-1]):
-            pnum = int(lines.pop(-1))
+        # printed page number is usually the last line; tolerate 1-2 trailing
+        # OCR-debris lines (e.g. 'à') after the digits
+        for tail in range(len(lines) - 1, max(len(lines) - 4, -1), -1):
+            if PAGE_NUM_RE.match(lines[tail]):
+                pnum = int(lines.pop(tail))
+                break
         pages.append({"file": f.name, "lines": lines, "pnum": pnum})
     return pages
 
@@ -431,6 +435,40 @@ def parse_chufang():
             else:
                 pend = None
 
+    # ---- TOC post-fix: drop fragments, split glued names ----
+    nameset = {norm_cn(n) for n, _, _ in toc}
+    body_all_norm = []
+    body_all_raw = []
+    for pg in pages[body_start:]:
+        for l in pg["lines"]:
+            s0 = re.sub(r"\s+", "", l)
+            body_all_norm.append(norm_cn(s0))
+            body_all_raw.append(s0)
+    body_set = set(body_all_norm)
+
+    fixed_toc = []
+    for n, p, c in toc:
+        nn = norm_cn(n)
+        if len(nn) < 2:
+            continue                      # OCR fragment like '师'
+        if len(nn) > 12:                  # likely two names glued
+            done = False
+            for k in range(len(n) - 1, 1, -1):
+                pre, suf = n[:k], n[k:]
+                if norm_cn(pre) in nameset and norm_cn(pre) != nn:
+                    fixed_toc.append((suf, p, c))
+                    done = True
+                    break
+                if norm_cn(pre) in body_set and norm_cn(suf) in body_set:
+                    fixed_toc.append((pre, p, c))
+                    fixed_toc.append((suf, p, c))
+                    done = True
+                    break
+            if done:
+                continue
+        fixed_toc.append((n, p, c))
+    toc = fixed_toc
+
     names = [n for n, _, _ in toc]
     cat_of = {n: c for n, _, c in toc}
     pnum_of = {n: p for n, p, _ in toc}
@@ -473,6 +511,127 @@ def parse_chufang():
 
     # expected pdf page for each toc name
     exp_idx = {n: pmap.get(pnum_of[n]) for n in names}
+    # printed->pdf offset for pages whose pnum failed to parse
+    import statistics
+    _offs = [i - p for p, i in pmap.items()]
+    OFF = round(statistics.median(_offs)) if _offs else 17
+
+    def exp_page(n):
+        if exp_idx.get(n) is not None:
+            return exp_idx[n]
+        p = pnum_of.get(n)
+        return (p + OFF) if p else None
+
+    # shared heading test — used by the rescue simulation AND the main loop.
+    # A real heading is a bare name: reject sentences ("…贫血。"), allow glued
+    # forms "name：desc" and "namename".
+    def heading_hit(s):
+        sn = norm_cn(s)
+        pureish = bool(re.fullmatch("[" + CN + "·、（）()]{2,25}", s))
+        colon_head = bool(re.match("^[" + CN + "]{2,12}[：:]", s))
+        if pureish and sn in norm2raw:
+            return norm2raw[sn]
+        if ("。" not in s and "；" not in s) or colon_head:
+            for nn in norm_names:
+                if len(nn) >= 2 and sn.startswith(nn):
+                    rest_n = sn[len(nn):]
+                    if rest_n.startswith(nn) or rest_n[:1] in "：:，,":
+                        return norm2raw[nn]
+        return None
+
+    # ---- fuzzy heading rescue ----
+    # names whose big-font headings were split or dropped by OCR:
+    # simulate main matcher; for unfindable names, locate a fragment within
+    # the expected page ±1 and splice the proper name in before parsing.
+    def main_would_hit(nn):
+        for l in body_all_raw:
+            if heading_hit(l) and norm_cn(heading_hit(l)) == nn:
+                return True
+        return False
+
+    pure_cn = lambda t: bool(re.fullmatch("[" + CN + r"]{1,4}", t))
+    rescued = []
+    for n in names:
+        nn = norm_cn(n)
+        if main_would_hit(nn):
+            continue
+        pi = exp_page(n)
+        if pi is None:
+            continue
+        done = False
+        # pass A: joined consecutive short pure-CN lines == name
+        for pj in (pi, pi - 1, pi + 1):
+            if pj < body_start or pj >= len(pages):
+                continue
+            lines = pages[pj]["lines"]
+            acc = []
+            for i, l in enumerate(lines):
+                s = norm_cn(re.sub(r"\s+", "", l))
+                acc.append((i, s) if pure_cn(s) else None)
+                joined = ""
+                for j in range(len(acc) - 1, -1, -1):
+                    if acc[j] is None:
+                        break
+                    joined = acc[j][1] + joined
+                    if joined == nn:
+                        st = acc[j][0]
+                        pages[pj]["lines"][st] = n
+                        for q in range(st + 1, i + 1):
+                            pages[pj]["lines"][q] = ""
+                        done = True
+                        break
+                    if len(joined) >= len(nn):
+                        break
+                if done:
+                    break
+            if done:
+                break
+        # pass B: single short line that is a suffix of the name
+        if not done:
+            for pj in (pi, pi - 1, pi + 1):
+                if pj < body_start or pj >= len(pages):
+                    continue
+                for i, l in enumerate(pages[pj]["lines"]):
+                    s = norm_cn(re.sub(r"\s+", "", l))
+                    if 1 <= len(s) <= 2 and pure_cn(s) and nn.endswith(s):
+                        pages[pj]["lines"][i] = n
+                        done = True
+                        break
+                if done:
+                    break
+        # pass C: heading lost entirely. If the page starts with unclassifiable
+        # OCR garbage, the heading died at the top -> inject at line 0.
+        # Otherwise the page continues a previous disease -> inject before the
+        # first description opener (俗称/系由/治疗…) or the next real heading.
+        if not done:
+            lines = pages[pi]["lines"]
+            NUML = re.compile(r"^(\d{1,2})[.、．]")
+            DESCOP = re.compile(r"^\s*(俗称|系由|本病|凡是|是为|治疗|预防|临床)")
+            DOSE = re.compile(r"[錢两克分斤枚粒条片]|水煎|煎服|捣|敷|炖|冲服|外用|灌服|服")
+
+            def classified(t):
+                t2 = re.sub(r"\s+", "", t)
+                return bool(NUML.match(t2) or DESCOP.match(t2)
+                            or DOSE.search(t2) or heading_hit(t2))
+
+            gi = 0
+            while gi < len(lines) and not classified(lines[gi]):
+                gi += 1
+            ins = 0
+            if gi == 0:  # page top is already content -> heading lost mid-page
+                for i, l in enumerate(lines):
+                    if DESCOP.match(l):
+                        ins = i
+                        break
+                else:
+                    for i, l in enumerate(lines):
+                        if heading_hit(re.sub(r"\s+", "", l)):
+                            ins = i
+                            break
+            pages[pi]["lines"].insert(ins, n)
+        rescued.append(n)
+    if rescued:
+        print(f"[chufang] rescued headings: {rescued}", file=sys.stderr)
 
     for idx, pg in enumerate(pages):
         if idx < body_start:
@@ -480,18 +639,7 @@ def parse_chufang():
 
         for line in pg["lines"]:
             s = re.sub(r"\s+", "", line)
-            sn = norm_cn(s)
-            hit = None
-            if sn in norm2raw:
-                hit = norm2raw[sn]
-            else:
-                for nn in norm_names:
-                    if len(nn) >= 2 and sn.startswith(nn):
-                        rest_n = sn[len(nn):]
-                        # glued heading+desc repeats name or uses ：; a lone "name系…" line is desc
-                        if rest_n.startswith(nn) or rest_n[:1] in "：:，,":
-                            hit = norm2raw[nn]
-                            break
+            hit = heading_hit(s)
             if hit:
                 rest = s[len(hit):]  # t2s/fold are 1:1 so raw offset == norm offset
                 open_disease(hit, rest, pg["file"])
@@ -538,7 +686,7 @@ def parse_chufang():
     missing = [n for n in names if n not in got]
     # fallback pass: create stub entries at expected pages for unmatched names
     for n in missing:
-        pi = exp_idx.get(n)
+        pi = exp_page(n)
         if pi is not None:
             entries.append({"book": book, "entry_type": "disease", "name": n,
                             "category": cat_of.get(n), "printed_page": pnum_of.get(n),

@@ -100,11 +100,17 @@ for h in kb["herbs"]:
     images = []
     nname = norm(name)
     alias_norms = {norm(a) for a in h.get("aliases", [])}
+    real_norms = {norm(n) for n in real_names}
     for book in dict.fromkeys(h.get("sources", [])):
         cand = entry_map.get((book, nname))
         if not cand:
             for e in by_book[book]:
                 if e["entry_type"] != "herb":
+                    continue
+                # an entry whose own name is another real herb belongs to that
+                # herb — alias collisions (e.g. 石决明 alias 千里光) must not
+                # pull its plate/photo across
+                if norm(e["name"]) in real_norms and norm(e["name"]) != nname:
                     continue
                 if norm(e["name"]) in alias_norms or \
                    any(norm(a) == nname for a in e.get("aliases", [])):
@@ -299,14 +305,42 @@ for d in diseases_out:
     d["slug"] = s
 
 # ---------- graph ----------
+# per-disease top herbs (for tooltip) — count occurrences across its formulas
+disease_herb_freq = defaultdict(Counter)
+for fo in formulas_out:
+    if not fo["disease_id"]:
+        continue
+    for c in fo["composition"]:
+        if c["herb_id"]:
+            disease_herb_freq[fo["disease_id"]][c["herb"]] += 1
+
+def _xw_excerpt(h):
+    for s in h["sections"]:
+        if s["label"] in ("性味", "性味功能"):
+            return next(iter(s["texts"].values()))[:60]
+    return ""
+
+def _fn_excerpt(h):
+    for s in h["sections"]:
+        if s["label"] in ("功能主治", "功用", "主治", "应用"):
+            return next(iter(s["texts"].values()))[:90]
+    return ""
+
 nodes, links = [], []
+h_by_id = {h["id"]: h for h in herbs_out}
 for h in herbs_out:
     nodes.append({"id": h["id"], "name": h["name"], "type": "herb",
-                  "slug": h["slug"], "cat": h["category"].split("·")[0] if h["category"] else ""})
+                  "slug": h["slug"], "cat": h["category"].split("·")[0] if h["category"] else "",
+                  "img": h["images"][0]["file"] if h.get("images") else "",
+                  "xw": _xw_excerpt(h), "fn": _fn_excerpt(h)})
 for d in diseases_out:
+    top = disease_herb_freq.get(d["id"], Counter()).most_common(6)
     nodes.append({"id": d["id"], "name": d["name"], "type": "disease",
-                  "slug": d["slug"], "cat": d["category"]})
+                  "slug": d["slug"], "cat": d["category"],
+                  "fc": len(d["formulas"]),
+                  "top": [t[0] for t in top]})
 seen_edge = set()
+adj = defaultdict(set)
 for fo in formulas_out:
     for c in fo["composition"]:
         if c["herb_id"] and fo["disease_id"]:
@@ -314,12 +348,90 @@ for fo in formulas_out:
             if k not in seen_edge:
                 seen_edge.add(k)
                 links.append({"source": c["herb_id"], "target": fo["disease_id"], "rel": "组方治疗"})
+                adj[c["herb_id"]].add(fo["disease_id"])
+                adj[fo["disease_id"]].add(c["herb_id"])
 for hid, dnames in herb_indic.items():
     for dn in dnames:
         did = did_of.get(dn)
         if did and (hid, did) not in seen_edge:
             seen_edge.add((hid, did))
             links.append({"source": hid, "target": did, "rel": "主治"})
+            adj[hid].add(did)
+            adj[did].add(hid)
+
+for n in nodes:
+    n["deg"] = len(adj.get(n["id"], ()))
+
+# ---------- precomputed layouts (no client-side simulation) ----------
+import math
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
+
+herb_ids = [n["id"] for n in nodes if n["type"] == "herb"]
+dis_ids = [n["id"] for n in nodes if n["type"] == "disease"]
+
+def norm_scale(pos, w=1000):
+    xs = [p[0] for p in pos.values()]; ys = [p[1] for p in pos.values()]
+    x0, x1 = min(xs), max(xs); y0, y1 = min(ys), max(ys)
+    xr = (x1 - x0) or 1; yr = (y1 - y0) or 1
+    s = w / max(xr, yr)
+    return {k: ((v[0] - (x0 + x1) / 2) * s, (v[1] - (y0 + y1) / 2) * s) for k, v in pos.items()}
+
+pos_spring = {}
+pos_bi = {}
+if nx is not None:
+    G = nx.Graph()
+    G.add_nodes_from(n["id"] for n in nodes)
+    G.add_edges_from((l["source"], l["target"]) for l in links)
+    # only layout the connected part; isolates go on a ring
+    comps = sorted(nx.connected_components(G), key=len, reverse=True)
+    main = comps[0] if comps else set()
+    pos_spring = norm_scale(nx.spring_layout(G.subgraph(main), seed=42, k=None, iterations=100), 1400)
+    # ring for isolated nodes
+    iso = [n["id"] for n in nodes if n["id"] not in main]
+    for i, nid in enumerate(iso):
+        a = 2 * math.pi * i / max(1, len(iso))
+        pos_spring[nid] = (820 * math.cos(a), 820 * math.sin(a))
+else:
+    # fallback: concentric by degree
+    hh = sorted(herb_ids, key=lambda x: -len(adj[x]))
+    dd = sorted(dis_ids, key=lambda x: -len(adj[x]))
+    for i, nid in enumerate(dd):
+        a = 2 * math.pi * i / len(dd)
+        pos_spring[nid] = (300 * math.cos(a), 300 * math.sin(a))
+    for i, nid in enumerate(hh):
+        a = 2 * math.pi * i / len(hh)
+        r = 500 + 60 * (i // 40)
+        pos_spring[nid] = (r * math.cos(a), r * math.sin(a))
+
+# bipartite: two horizontal rows, barycenter ordering to reduce crossings
+def barycentric(rows_a, rows_b):
+    pa = {x: i for i, x in enumerate(rows_a)}
+    pb = {x: i for i, x in enumerate(rows_b)}
+    inf = float("inf")
+    for _ in range(6):
+        rows_b = sorted(rows_b, key=lambda d: (sum(pa[h] for h in adj[d] if h in pa) / max(1, len([h for h in adj[d] if h in pa])) if any(h in pa for h in adj[d]) else inf))
+        pb = {x: i for i, x in enumerate(rows_b)}
+        rows_a = sorted(rows_a, key=lambda h: (sum(pb[d] for d in adj[h] if d in pb) / max(1, len([d for d in adj[h] if d in pb])) if any(d in pb for d in adj[h]) else inf))
+        pa = {x: i for i, x in enumerate(rows_a)}
+    return pa, pb
+
+ha = [h for h in sorted(herb_ids, key=lambda x: -len(adj[x]))]
+db = [d for d in sorted(dis_ids, key=lambda x: -len(adj[x]))]
+pa, pb = barycentric(ha, db)
+span = max(len(ha), len(db))
+for h, i in pa.items():
+    pos_bi[h] = ((i - len(pa) / 2) * (1500 / span), -300.0)
+for d, i in pb.items():
+    pos_bi[d] = ((i - len(pb) / 2) * (1500 / span), 300.0)
+
+for n in nodes:
+    x, y = pos_spring.get(n["id"], (0, 0))
+    n["x"], n["y"] = round(x, 1), round(y, 1)
+    x2, y2 = pos_bi.get(n["id"], (0, 0))
+    n["bx"], n["by"] = round(x2, 1), round(y2, 1)
 
 graph = {"nodes": nodes, "links": links}
 

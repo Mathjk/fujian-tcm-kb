@@ -158,6 +158,10 @@ def main():
             h["fields"][k][e["book"]] = v.strip()
         if e.get("family"):
             h["family"] = e["family"]
+        if not h["family"]:
+            m = re.search(r"为([^，,。、；;（(]{1,10}?科)", e["fields"].get("来源") or "")
+            if m:
+                h["family"] = m.group(1)
         if e.get("latin") and not h["latin"]:
             h["latin"] = e["latin"]
         if e.get("category"):
@@ -181,6 +185,16 @@ def main():
     for key in list(herbs.keys()):
         if key in alias2canon and alias2canon[key] != key and alias2canon[key] in herbs:
             tgt = herbs[alias2canon[key]]
+            src = herbs[key]
+            # homonym guard: an alias name may denote a genuinely different drug
+            # (e.g. 石决明's alias 千里光 vs the plant 千里光). If both sides carry
+            # conflicting latin/family info, keep them as separate entries.
+            if src["latin"] and tgt["latin"] and src["latin"].strip().lower() != tgt["latin"].strip().lower():
+                alias2canon.pop(key, None)
+                continue
+            if src["family"] and tgt["family"] and src["family"] != tgt["family"]:
+                alias2canon.pop(key, None)
+                continue
             src = herbs.pop(key)
             tgt["sources"] = sorted(set(tgt["sources"] + src["sources"]))
             for k, vb in src["fields"].items():

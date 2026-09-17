@@ -12,7 +12,12 @@ import Base from '../layouts/Base.astro';
           <label><input type="checkbox" id="showD" checked /> 病症节点</label>
           <label><input type="checkbox" id="relTreat" checked /> 「组方治疗」边</label>
           <label><input type="checkbox" id="relIndic" checked /> 「主治」边</label>
+          <label><input type="checkbox" id="picMode" /> 图片节点</label>
         </div>
+      </div>
+      <div class="panel" style="display:flex;gap:6px">
+        <button class="chip" id="layNet" style="cursor:pointer;border-color:var(--cinnabar);color:var(--cinnabar)">网状</button>
+        <button class="chip" id="layBi" style="cursor:pointer">二分</button>
       </div>
       <div class="panel graph-legend">
         <span><i class="dot" style="background:#3f5d46"></i>草药</span>
@@ -29,60 +34,138 @@ import Base from '../layouts/Base.astro';
     chart.showLoading({ text: '图谱加载中…', color: '#b23a24', textColor: '#57503f', maskColor: 'rgba(246,241,229,.7)' });
 
     let DATA = null;
-    const nodeById = {};
+    let layout = 'net';          // 'net' | 'bi'
+    let picMode = false;
+    let autoPic = false;         // zoom-triggered
 
-    function rebuild() {
+    const esc = s => (s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+    function tip(p) {
+      const d = p.data;
+      if (d.type === 'herb') {
+        const img = d.img ? `<img src="${BASE}/img/${d.img}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:6px">` : '';
+        return `<div style="max-width:240px">${img}
+          <b style="font-size:15px">${esc(d.name)}</b>
+          <span style="color:#8a7f66;font-size:12px"> · ${esc(d.cat || '草药')}</span><br/>
+          ${d.xw ? `<div style="color:#57503f;font-size:12.5px;margin-top:2px"><b style="color:#a5823c">性味</b> ${esc(d.xw)}</div>` : ''}
+          ${d.fn ? `<div style="color:#57503f;font-size:12.5px;margin-top:2px"><b style="color:#a5823c">主治</b> ${esc(d.fn)}…</div>` : ''}
+          <div style="color:#8a7f66;font-size:11px;margin-top:4px">${d.deg} 条关联 · 点击查看详情</div></div>`;
+      }
+      return `<div style="max-width:220px"><b style="font-size:15px">${esc(d.name)}</b>
+        <span style="color:#8a7f66;font-size:12px"> · ${esc(d.cat || '病症')}</span><br/>
+        <div style="color:#57503f;font-size:12.5px;margin-top:2px">验方 ${d.fc ?? 0} 首 · ${d.deg} 条关联</div>
+        ${d.top?.length ? `<div style="color:#57503f;font-size:12px;margin-top:3px">常用药：${esc(d.top.join('、'))}</div>` : ''}
+        <div style="color:#8a7f66;font-size:11px;margin-top:4px">点击查看详情</div></div>`;
+    }
+
+    function nodeSym(n, zoomed) {
+      if ((picMode || zoomed) && n.type === 'herb' && n.img)
+        return 'image://' + BASE + '/img/' + n.img;
+      return 'circle';
+    }
+
+    function buildNodes(zoomed) {
       const showH = document.getElementById('showH').checked;
       const showD = document.getElementById('showD').checked;
+      const keep = n => (n.type === 'herb' ? showH : showD);
+      return DATA.nodes.filter(keep).map(n => ({
+        id: n.id, name: n.name, slug: n.slug, type: n.type,
+        img: n.img, xw: n.xw, fn: n.fn, fc: n.fc, top: n.top, cat: n.cat, deg: n.deg,
+        x: layout === 'net' ? n.x : n.bx,
+        y: layout === 'net' ? n.y : n.by,
+        fixed: true,
+        symbol: nodeSym(n, zoomed),
+        symbolSize: (picMode || zoomed) && n.type === 'herb' && n.img
+          ? Math.min(44, 18 + Math.sqrt(n.deg) * 4)
+          : Math.min(24, 6 + Math.sqrt(n.deg) * 2.2),
+        symbolKeepAspect: true,
+        itemStyle: { color: n.type === 'herb' ? '#3f5d46' : '#b23a24', borderColor: '#f6f1e5', borderWidth: 1.5 },
+        label: {
+          show: (picMode || zoomed) ? n.deg > 4 : n.deg > 16,
+          position: 'bottom', fontSize: 11, color: '#2c2820',
+          fontFamily: 'Songti SC, STSong, SimSun, serif',
+        },
+      }));
+    }
+
+    let lastNodes = [];
+    function rebuild(zoomed = false) {
       const rT = document.getElementById('relTreat').checked;
       const rI = document.getElementById('relIndic').checked;
-      const keep = n => (n.type === 'herb' ? showH : showD);
-      const nodes = DATA.nodes.filter(keep).map(n => ({
-        id: n.id, name: n.name, slug: n.slug, type: n.type,
-        category: n.type === 'herb' ? 0 : 1,
-        symbolSize: Math.min(26, 7 + Math.sqrt(n.deg || 1) * 2.4),
-        itemStyle: { color: n.type === 'herb' ? '#3f5d46' : '#b23a24', borderColor: '#f6f1e5', borderWidth: 1.5 },
-        label: { show: (n.deg || 0) > 14, fontSize: 11, color: '#2c2820' },
-      }));
+      const nodes = buildNodes(zoomed);
+      lastNodes = nodes;
       const ids = new Set(nodes.map(n => n.id));
       const links = DATA.links.filter(l =>
-        ids.has(l.source) && ids.has(l.target) &&
-        (l.rel === '组方治疗' ? rT : rI));
+        ids.has(l.source) && ids.has(l.target) && (l.rel === '组方治疗' ? rT : rI));
       chart.setOption({
+        animationDurationUpdate: 600,
         tooltip: {
-          formatter: p => p.dataType === 'node'
-            ? `${p.data.name}<br/><span style="color:#8a7f66;font-size:12px">${p.data.type === 'herb' ? '草药' : '病症'} · ${p.data.deg ?? 0} 关联</span>`
-            : `${p.data.rel}`,
+          formatter: tip, enterable: true, confine: true,
+          backgroundColor: 'rgba(251,247,238,.97)', borderColor: '#d9cdb4',
+          textStyle: { color: '#2c2820' }, extraCssText: 'box-shadow:0 4px 18px rgba(60,45,20,.18);border-radius:8px;padding:10px;',
         },
         series: [{
-          type: 'graph', layout: 'force', roam: true, draggable: true,
+          type: 'graph', layout: 'none', roam: true, draggable: true,
           nodes, links,
-          force: { repulsion: 60, edgeLength: [30, 90], gravity: 0.08, friction: 0.25 },
-          lineStyle: { color: '#c9ba9c', width: 1, opacity: .55, curveness: 0.08 },
-          emphasis: { focus: 'adjacency', lineStyle: { color: '#b23a24', width: 2, opacity: .9 }, label: { show: true } },
-          scaleLimit: { min: 0.15, max: 8 },
+          lineStyle: { color: '#c9ba9c', width: 1, opacity: .5, curveness: 0.06 },
+          emphasis: { focus: 'adjacency', lineStyle: { color: '#b23a24', width: 2, opacity: .9 }, label: { show: true, fontSize: 13, fontWeight: 'bold' } },
+          scaleLimit: { min: 0.12, max: 10 },
+          progressive: 400,
         }],
       }, { replaceMerge: ['series'] });
     }
 
     fetch(BASE + '/data/graph.json').then(r => r.json()).then(g => {
-      // degree
-      const deg = {};
-      for (const l of g.links) { deg[l.source] = (deg[l.source] || 0) + 1; deg[l.target] = (deg[l.target] || 0) + 1; }
-      g.nodes.forEach(n => { n.deg = deg[n.id] || 0; nodeById[n.name] = n; });
       DATA = g;
       chart.hideLoading();
       rebuild();
     });
 
     ['showH', 'showD', 'relTreat', 'relIndic'].forEach(id =>
-      document.getElementById(id).addEventListener('change', rebuild));
+      document.getElementById(id).addEventListener('change', () => rebuild(autoPic)));
+    document.getElementById('picMode').addEventListener('change', e => { picMode = e.target.checked; rebuild(picMode); });
 
+    const btnN = document.getElementById('layNet'), btnB = document.getElementById('layBi');
+    function setLayout(m) {
+      layout = m;
+      for (const [b, on] of [[btnN, m === 'net'], [btnB, m === 'bi']]) {
+        b.style.borderColor = on ? 'var(--cinnabar)' : '';
+        b.style.color = on ? 'var(--cinnabar)' : '';
+      }
+      rebuild(autoPic);
+    }
+    btnN.onclick = () => setLayout('net');
+    btnB.onclick = () => setLayout('bi');
+
+    // zoom -> auto switch to image nodes
+    let roamT = null;
+    chart.on('graphRoam', () => {
+      clearTimeout(roamT);
+      roamT = setTimeout(() => {
+        const z = chart.getOption().series?.[0]?.zoom ?? 1;
+        const want = z >= 2.2;
+        if (want !== autoPic) { autoPic = want; rebuild(autoPic); }
+      }, 180);
+    });
+
+    // search -> focus
+    let lastHi = null;
     document.getElementById('gq').addEventListener('input', e => {
       const v = e.target.value.trim();
-      if (!v || !DATA) return;
-      const n = DATA.nodes.find(n => n.name.includes(v));
-      if (n) chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: n.name });
+      if (!DATA) return;
+      if (lastHi) chart.dispatchAction({ type: 'downplay', seriesIndex: 0, name: lastHi });
+      if (!v) return;
+      const n = DATA.nodes.find(n => n.name === v) || DATA.nodes.find(n => n.name.includes(v));
+      if (n) {
+        lastHi = n.name;
+        const di = lastNodes.findIndex(x => x.id === n.id);
+        if (di < 0) return;
+        chart.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: di });
+        chart.dispatchAction({ type: 'focusNodeAdjacency', seriesIndex: 0, dataIndex: di });
+        const x = layout === 'net' ? n.x : n.bx, y = layout === 'net' ? n.y : n.by;
+        const pt = chart.convertToPixel({ seriesIndex: 0 }, [x, y]);
+        chart.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: di, position: pt });
+      }
     });
 
     chart.on('click', p => {

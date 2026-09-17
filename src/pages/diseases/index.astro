@@ -4,18 +4,34 @@ import { u } from '../../utils/url';
 import diseases from '../../data/diseases.json';
 import meta from '../../data/meta.json';
 
+// category -> domain
+function domainOf(c: string) {
+  if (/兽医/.test(c)) return 'vet';
+  if (/除害|灭虫|农药/.test(c)) return 'pest';
+  return 'human';
+}
+const CN_NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+function catRank(c: string) {
+  const m = c.match(/^([一二三四五六七八九十]+)、/);
+  if (m) return CN_NUM.indexOf(m[1]);
+  return 98; // 其他 etc.
+}
+
 const groups = new Map<string, any[]>();
 for (const d of diseases as any[]) {
   const c = d.category || '其他';
   if (!groups.has(c)) groups.set(c, []);
   groups.get(c)!.push(d);
 }
-// keep book-ish order: put numbered categories first (they start with 一、二、…), then others
-const ordered = [...groups.entries()].sort((a, b) => {
-  const ra = /^[一二三四五六七八九十]+、/.test(a[0]) ? 0 : 1;
-  const rb = /^[一二三四五六七八九十]+、/.test(b[0]) ? 0 : 1;
-  return ra - rb || a[0].localeCompare(b[0], 'zh');
-});
+const domains: { key: string; title: string; desc: string; cats: [string, any[]][] }[] = [
+  { key: 'human', title: '人畜疾病', desc: '依原书科别归类', cats: [] },
+  { key: 'vet', title: '兽医', desc: '畜禽疾病验方', cats: [] },
+  { key: 'pest', title: '农卫除害', desc: '除害灭虫、土农药用途', cats: [] },
+];
+for (const [cat, ds] of groups) {
+  domains.find(dm => dm.key === domainOf(cat))!.cats.push([cat, ds]);
+}
+for (const dm of domains) dm.cats.sort((a, b) => catRank(a[0]) - catRank(b[0]));
 ---
 <Base title="病症" desc="按科别索引病症与对应验方">
   <div class="wrap">
@@ -25,32 +41,51 @@ const ordered = [...groups.entries()].sort((a, b) => {
       <input id="q" type="search" placeholder="搜病症…" />
     </div>
     <div id="groups">
-      {ordered.map(([cat, ds]) => (
-        <div class="cat-group" data-cat={cat}>
-          <h3>{cat} <span style="color:var(--ink-3);font-weight:400;font-size:13px">（{ds.length}）</span></h3>
-          <div class="pill-list">
-            {ds.map((d: any) => (
-              <a class="pill" href={u('/diseases/' + d.slug)} data-name={d.name}>
-                {d.name}<span class="c">{d.formulas.length}</span>
-              </a>
-            ))}
-          </div>
-        </div>
+      {domains.filter(dm => dm.cats.length).map(dm => (
+        <section class="domain-block">
+          <h2 class="domain-title">{dm.title} <span>{dm.desc}</span></h2>
+          {dm.cats.map(([cat, ds]) => (
+            <div class="cat-group" data-cat={cat}>
+              <h3>{cat} <span style="color:var(--ink-3);font-weight:400;font-size:13px">（{ds.length}）</span></h3>
+              <div class="pill-list">
+                {ds.map((d: any) => (
+                  <a class="pill" href={u('/diseases/' + d.slug)} data-name={d.name}>
+                    {d.name}<span class="c">{d.formulas.length}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
       ))}
     </div>
   </div>
+  <style>
+    .domain-block { margin-bottom: 34px; }
+    .domain-title {
+      font-size: 21px; margin: 26px 0 4px; padding-bottom: 8px;
+      border-bottom: 2px solid var(--ink-1);
+      display: flex; align-items: baseline; gap: 10px;
+    }
+    .domain-title span { font-size: 12.5px; color: var(--ink-3); font-weight: 400; }
+  </style>
   <script>
     const q = document.getElementById('q');
     q.addEventListener('input', () => {
       const v = q.value.trim();
-      document.querySelectorAll('.cat-group').forEach(g => {
+      document.querySelectorAll('.domain-block').forEach(b => {
         let any = false;
-        g.querySelectorAll('.pill').forEach(p => {
-          const show = !v || p.dataset.name.includes(v);
-          p.style.display = show ? '' : 'none';
-          if (show) any = true;
+        b.querySelectorAll('.cat-group').forEach(g => {
+          let gAny = false;
+          g.querySelectorAll('.pill').forEach(p => {
+            const show = !v || p.dataset.name.includes(v);
+            p.style.display = show ? '' : 'none';
+            if (show) gAny = true;
+          });
+          g.style.display = gAny ? '' : 'none';
+          if (gAny) any = true;
         });
-        g.style.display = any ? '' : 'none';
+        b.style.display = any ? '' : 'none';
       });
     });
   </script>
