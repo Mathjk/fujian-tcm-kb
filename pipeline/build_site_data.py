@@ -509,6 +509,90 @@ if _gp.exists():
             "division": r.get("division", ""),
         })
 
+# ---------- supplementary: 中成药 ----------
+patent_out = []
+_mp = ROOT / "supp_data" / "json" / "中成药药品.json"
+_mz = ROOT / "supp_data" / "json" / "中成药症状.json"
+if _mp.exists() or _mz.exists():
+    meds = {}
+
+    def mrec(n):
+        return meds.setdefault(n, {"name": n, "team": [], "func": "", "effect": "",
+                                   "zheng": set(), "desc": set(), "jian": set()})
+
+    if _mp.exists():
+        for r in json.loads(_mp.read_text()):
+            z = re.sub(r"\d+$", "", r["zheng"]).strip()
+            for m in r.get("medicine", "").split("-"):
+                m = m.strip()
+                if not m:
+                    continue
+                rec = mrec(m)
+                rec["zheng"].add(z)
+                if r.get("desc"):
+                    rec["desc"].add(r["desc"])
+    if _mz.exists():
+        for r in json.loads(_mz.read_text()):
+            z = re.sub(r"\d+$", "", r["zheng"]).strip()
+            for m in re.split(r"[-、]", r.get("jiaJian", "")):
+                m = m.strip()
+                if not m:
+                    continue
+                rec = mrec(m)
+                rec["zheng"].add(z)
+                if r.get("medicine") and not rec["func"]:
+                    rec["func"] = r["medicine"]
+                if r.get("effect") and not rec["effect"]:
+                    rec["effect"] = r["effect"]
+                if r.get("jian"):
+                    rec["jian"].add(r["jian"])
+                for tok in re.split(r"[-*]", r.get("team", "")):
+                    tok = re.sub(r"^[A-Z]\d+", "", tok).strip()
+                    if tok and tok not in rec["team"]:
+                        rec["team"].append(tok)
+
+    # composition token -> herb link (with part-name aliases)
+    PATENT_ALIAS = {
+        "荆芥穗": "荆芥", "苦杏仁": "杏仁", "紫苏叶": "紫苏", "紫苏梗": "紫苏",
+        "金银花": "忍冬", "生姜皮": "生姜", "干地黄": "地黄", "熟地黄": "地黄",
+        "生地黄": "地黄", "川牛膝": "牛膝", "怀牛膝": "牛膝", "浙贝母": "贝母",
+        "川贝母": "贝母", "广藿香": "藿香", "云苓": "茯苓", "炒白术": "白术",
+        "炙甘草": "甘草", "蜜麻黄": "麻黄", "煅牡蛎": "牡蛎", "生石膏": "石膏",
+        "干姜": "生姜", "山萸肉": "山茱萸", "酒大黄": "大黄", "焦山楂": "山楂",
+    }
+    zname2slug = {z["name"]: z["slug"] for z in zheng_out}
+    used_m = set()
+    unmatched_tok = Counter()
+    for n, rec in meds.items():
+        herbs_l = []
+        for tok in rec["team"]:
+            tgt = PATENT_ALIAS.get(tok, tok)
+            hid = hid_of.get(norm(tgt))
+            herbs_l.append({"n": tok, "s": hslug_of.get(hid)})
+            if not hid:
+                unmatched_tok[tok] += 1
+        s = re.sub(r"[\\/\\?%*:|\"<>#&=+．。()（）\[\]【】,，、;；:：\s]+", "-", n).strip("-") or "m"
+        base_s, i = s, 2
+        while s in used_m:
+            s = f"{base_s}-{i}"; i += 1
+        used_m.add(s)
+        patent_out.append({
+            "name": n, "slug": s,
+            "team": herbs_l, "func": rec["func"],
+            "effect": [x for x in re.split(r"[-–—]", rec["effect"]) if x.strip()],
+            "zheng": [{"n": z, "s": zname2slug.get(z)} for z in sorted(rec["zheng"])],
+            "desc": sorted(rec["desc"]), "jian": sorted(rec["jian"]),
+        })
+    patent_out.sort(key=lambda x: x["name"])
+    # reverse: herb -> patents
+    slug2herb = {h["slug"]: h for h in herbs_out}
+    for p in patent_out:
+        for c in p["team"]:
+            hh = slug2herb.get(c["s"]) if c["s"] else None
+            if hh is not None:
+                hh.setdefault("patents", []).append({"n": p["name"], "s": p["slug"]})
+    print("unmatched patent tokens:", unmatched_tok.most_common(15))
+
 # ---------- graph ----------
 # per-disease top herbs (for tooltip) — count occurrences across its formulas
 disease_herb_freq = defaultdict(Counter)
@@ -662,6 +746,9 @@ for z in zheng_out:
 for g in glossary_out:
     search.append({"t": "g", "n": g["name"], "s": g["name"],
                    "k": " ".join([g.get("category", ""), g.get("desc", "")[:200]])})
+for p in patent_out:
+    search.append({"t": "c", "n": p["name"], "s": p["slug"],
+                   "k": " ".join([z["n"] for z in p["zheng"]] + [p.get("func", "")[:200]])})
 
 meta = {
     "title": "闽本草",
@@ -670,6 +757,7 @@ meta = {
     "images": sum(len(h["images"]) for h in herbs_out),
     "english": en_hits, "zhushi": supp_hits,
     "zheng": len(zheng_out), "glossary": len(glossary_out),
+    "patents": len(patent_out),
     "skipped_junk": skipped,
 }
 
@@ -678,6 +766,7 @@ meta = {
 (SD / "formulas.json").write_text(json.dumps(formulas_out, ensure_ascii=False))
 (SD / "zhengxing.json").write_text(json.dumps(zheng_out, ensure_ascii=False))
 (SD / "glossary.json").write_text(json.dumps(glossary_out, ensure_ascii=False))
+(SD / "patent.json").write_text(json.dumps(patent_out, ensure_ascii=False))
 (SD / "graph.json").write_text(json.dumps(graph, ensure_ascii=False))
 (SD / "search.json").write_text(json.dumps(search, ensure_ascii=False))
 (SD / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))

@@ -1,0 +1,85 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../utils/url';
+import patent from '../../data/patent.json';
+
+export function getStaticPaths() {
+  return patent.map((p: any) => ({ params: { slug: p.slug }, props: { p } }));
+}
+const { p } = Astro.props;
+const linked = p.team.filter((c: any) => c.s);
+const unlinked = p.team.filter((c: any) => !c.s);
+const issueUrl = 'https://github.com/Mathjk/fujian-tcm-kb/issues/new?title='
+  + encodeURIComponent('[纠错] 成药：' + p.name)
+  + '&body=' + encodeURIComponent('条目：' + p.name + '\n页面：/chengyao/' + p.slug + '\n\n问题描述：');
+---
+<Base title={p.name} desc="中成药 · 组成与功效">
+  <div class="wrap">
+    <h1 class="page-title">{p.name}</h1>
+    <div class="d-meta" style="margin:-14px 0 30px">
+      <span class="chip pine">中成药</span>
+      <span class="supp-tag">补充资料</span>
+    </div>
+
+    {p.func && (
+      <section class="sec" style="margin-top:0">
+        <div class="sec-h">功效主治</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{p.func}</div>
+      </section>
+    )}
+
+    {p.team.length > 0 && (
+      <section class="sec" style={p.func ? '' : 'margin-top:0'}>
+        <div class="sec-h">组成（{p.team.length}）</div>
+        <div class="sec-bd rel-list">
+          {linked.map((c: any) => <a class="pill" href={u('/herbs/' + c.s)}>{c.n}</a>)}
+          {unlinked.map((c: any) => <span class="pill plain">{c.n}</span>)}
+        </div>
+      </section>
+    )}
+
+    {p.effect.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">方解</div>
+        <div class="sec-bd">
+          <ol class="proc-list">
+            {p.effect.map((x: string) => <li>{x}</li>)}
+          </ol>
+        </div>
+      </section>
+    )}
+
+    {p.zheng.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">适用证候</div>
+        <div class="sec-bd rel-list">
+          {p.zheng.map((z: any) => z.s
+            ? <a class="pill indic" href={u('/bianzheng/' + z.s)}>{z.n}</a>
+            : <span class="pill plain indic">{z.n}</span>)}
+        </div>
+      </section>
+    )}
+
+    {p.desc.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">用药辨析</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">
+          {p.desc.map((t: string) => <p style="margin:0 0 10px">{t}</p>)}
+        </div>
+      </section>
+    )}
+
+    {p.jian.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">常见情形</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">
+          {p.jian.map((t: string) => <p style="margin:0 0 8px">· {t}</p>)}
+        </div>
+      </section>
+    )}
+
+    <div class="feedback">本条内容有误？<a href={issueUrl} target="_blank" rel="noopener">点此反馈</a></div>
+
+    <div style="margin:50px 0"><a href={u('/chengyao')}>← 返回中成药</a></div>
+  </div>
+</Base>

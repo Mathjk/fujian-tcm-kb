@@ -252,6 +252,10 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hi); border
 .gl-desc { font-size: 13px; color: var(--ink-2); line-height: 1.75; margin-top: 8px; }
 .gl-dlg { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; font-family: var(--kai); }
 
+.pill.plain { cursor: default; color: var(--ink-2); }
+.cy-card { display: block; text-decoration: none; color: inherit; }
+.cy-zheng { font-size: 11.5px; color: var(--gold); margin-top: 4px; }
+
 .sec { margin-top: 26px; }
 .sec-h {
   display: flex; align-items: center; gap: 10px;

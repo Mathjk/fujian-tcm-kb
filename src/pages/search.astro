@@ -16,7 +16,8 @@ import { u } from '../utils/url';
     fetch(BASE + '/data/search.json').then(r => r.json()).then(d => { idx = d; });
 
     const TMAP = { h: ['草药', 'pine', '/herbs/'], d: ['病症', 'red', '/diseases/'],
-                   z: ['证候', 'gold', '/bianzheng/'], g: ['症状', '', '/glossary#'] };
+                   z: ['证候', 'gold', '/bianzheng/'], g: ['症状', '', '/glossary#'],
+                   c: ['成药', 'pine', '/chengyao/'] };
     const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     function render() {
       const v = q.value.trim();

@@ -117,6 +117,15 @@ const bookCount = herb.books?.length ?? 0;
       </section>
     )}
 
+    {herb.patents?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">相关中成药 <span class="supp-tag">补充资料</span></div>
+        <div class="sec-bd rel-list">
+          {herb.patents.map((p: any) => <a class="pill indic" href={u('/chengyao/' + p.s)}>{p.n}</a>)}
+        </div>
+      </section>
+    )}
+
     <div class="feedback">本条内容有误？<a href={`https://github.com/Mathjk/fujian-tcm-kb/issues/new?title=${encodeURIComponent('[纠错] 草药：' + herb.name)}&body=${encodeURIComponent('条目：' + herb.name + '\n页面：/herbs/' + herb.slug + '\n\n问题描述：')}`} target="_blank" rel="noopener">点此反馈</a></div>
 
     <div style="margin:50px 0"><a href={u('/herbs')}>← 返回草药图谱</a></div>
