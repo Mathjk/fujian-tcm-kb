@@ -28,8 +28,17 @@ const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
       {relHerbs.length > 0 && <span class="chip pine">涉药 {relHerbs.length} 味</span>}
     </div>
 
-    {relHerbs.length > 0 && (
+    {d.desc?.length > 0 && (
       <section class="sec" style="margin-top:0">
+        <div class="sec-h">病症概述</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">
+          {d.desc.map((p: string) => <p style="margin:0 0 10px">{p}</p>)}
+        </div>
+      </section>
+    )}
+
+    {relHerbs.length > 0 && (
+      <section class="sec">
         <div class="sec-h">常用草药</div>
         <div class="sec-bd rel-list">
           {relHerbs.slice(0, 40).map((h: any) => <a class="pill" href={u('/herbs/' + h.slug)}>{h.name}</a>)}
@@ -44,6 +53,13 @@ const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
         {myFormulas.length === 0 && <div class="empty">暂无方剂</div>}
       </div>
     </section>
+
+    {d.trailing && (
+      <section class="sec">
+        <div class="sec-h">选配药 · 补充</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{d.trailing}</div>
+      </section>
+    )}
 
     <div style="margin:50px 0"><a href={u('/diseases')}>← 返回病症索引</a></div>
   </div>

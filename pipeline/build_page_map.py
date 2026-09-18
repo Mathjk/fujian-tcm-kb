@@ -22,7 +22,9 @@ def page_num(texts):
 out = {}
 for book in sorted(os.listdir(f"{ROOT}/ocr")):
     m = {}
-    for fp in glob.glob(f"{ROOT}/ocr/{book}/page-*.json"):
+    files = sorted(glob.glob(f"{ROOT}/ocr/{book}/page-*.json"),
+                   key=lambda p: int(re.search(r"page-(\d+)", p).group(1)))
+    for fp in files:
         try:
             texts = json.load(open(fp, encoding="utf-8"))["res"]["rec_texts"]
         except Exception:
@@ -30,6 +32,19 @@ for book in sorted(os.listdir(f"{ROOT}/ocr")):
         n = page_num(texts)
         if n:
             m[os.path.basename(fp)] = n
+    # interpolate gaps: unmapped page between two mapped pages
+    idx = {os.path.basename(f): int(re.search(r"page-(\d+)", f).group(1)) for f in files}
+    names = [os.path.basename(f) for f in files]
+    for i, nm in enumerate(names):
+        if nm in m:
+            continue
+        # find nearest mapped neighbors
+        lo = next((names[j] for j in range(i - 1, -1, -1) if names[j] in m), None)
+        hi = next((names[j] for j in range(i + 1, len(names)) if names[j] in m), None)
+        if lo and hi:
+            gap = idx[hi] - idx[lo]
+            if m[hi] - m[lo] == gap:        # printed numbers step in sync
+                m[nm] = m[lo] + (idx[nm] - idx[lo])
     out[book] = m
     print(book, len(m), "pages mapped")
 

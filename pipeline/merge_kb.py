@@ -141,7 +141,8 @@ def main():
             return None
         if key not in diseases:
             diseases[key] = {"id": "d_" + key, "name": key, "category": cat or "",
-                             "formulas": [], "sources": set()}
+                             "formulas": [], "sources": set(),
+                             "descs": [], "trailing": ""}
         d = diseases[key]
         if cat and not d["category"]:
             d["category"] = cat
@@ -218,6 +219,13 @@ def main():
         if d is None:
             continue
         d["sources"].add(e["book"])
+        # narrative: group descriptions + trailing notes (选配药 etc.)
+        for g in e.get("groups", []):
+            dc = (g.get("desc") or "").strip()
+            if dc and dc not in d["descs"]:
+                d["descs"].append(dc)
+        if (e.get("trailing") or "").strip():
+            d["trailing"] = (d["trailing"] + " " + e["trailing"].strip()).strip()
         if "formulas" in e:        # fangxuan books
             for fm in e["formulas"]:
                 fid = f'f_{len(formulas)}'
@@ -227,7 +235,8 @@ def main():
                     "id": fid, "book": e["book"], "disease": d["name"],
                     "fields": fm["fields"], "composition": comp,
                     "page": fm.get("page"),
-                    "pnum": PMAP.get(e["book"], {}).get(fm.get("page"))})
+                    "pnum": PMAP.get(e["book"], {}).get(fm.get("page"))
+                            or PMAP.get(e["book"], {}).get((e.get("pages") or [None])[0])})
                 d["formulas"].append(fid)
         for g in e.get("groups", []):   # chufang
             for it in g.get("items", []):

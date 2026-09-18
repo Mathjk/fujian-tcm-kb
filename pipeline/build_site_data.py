@@ -226,6 +226,8 @@ for d in kb["diseases"]:
         "category": cat,
         "formulas": d.get("formulas", []),
         "books": sorted(set(d.get("sources", []))),
+        "desc": d.get("descs", []),
+        "trailing": d.get("trailing", ""),
     })
 did_of = {d["name"]: d["id"] for d in diseases_out}
 # 除害灭虫条目归并同名（如马尾松灭→马尾松）后可能重名，去重
@@ -234,6 +236,10 @@ for d in diseases_out:
     if d["name"] in _dedup:
         _dedup[d["name"]]["formulas"] += d["formulas"]
         _dedup[d["name"]]["books"] = sorted(set(_dedup[d["name"]]["books"]) | set(d["books"]))
+        for x in d.get("desc", []):
+            if x not in _dedup[d["name"]]["desc"]:
+                _dedup[d["name"]]["desc"].append(x)
+        _dedup[d["name"]]["trailing"] = (_dedup[d["name"]]["trailing"] + " " + d.get("trailing", "")).strip()
     else:
         _dedup[d["name"]] = d
 diseases_out = list(_dedup.values())
