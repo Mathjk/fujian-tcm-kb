@@ -17,7 +17,8 @@ import { u } from '../utils/url';
 
     const TMAP = { h: ['草药', 'pine', '/herbs/'], d: ['病症', 'red', '/diseases/'],
                    z: ['证候', 'gold', '/bianzheng/'], g: ['症状', '', '/glossary#'],
-                   c: ['成药', 'pine', '/chengyao/'] };
+                   c: ['成药', 'pine', '/chengyao/'], j: ['经方', 'gold', '/jingfang/'],
+                   y: ['医案', 'red', '/yian/'] };
     const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     function render() {
       const v = q.value.trim();

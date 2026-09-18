@@ -1,0 +1,112 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../utils/url';
+import jingfang from '../../data/jingfang.json';
+
+export function getStaticPaths() {
+  return jingfang.map((j: any) => ({ params: { slug: j.slug }, props: { j } }));
+}
+const { j } = Astro.props;
+const cause = j.cause ?? [];
+const fb = 'https://github.com/Mathjk/fujian-tcm-kb/issues/new?title='
+  + encodeURIComponent('[纠错] 经方：' + j.name)
+  + '&body=' + encodeURIComponent('条目：' + j.name + '\n页面：/jingfang/' + j.slug + '\n\n问题描述：');
+---
+<Base title={j.name} desc="经方 · 伤寒类方">
+  <div class="wrap">
+    <h1 class="page-title">{j.name}</h1>
+    <div class="d-meta" style="margin:-14px 0 30px">
+      <span class="chip gold">经方</span>
+      <span class="supp-tag">补充资料</span>
+      {j.zslug && <a class="chip pine" href={u('/bianzheng/' + j.zslug)}>证候详析 →</a>}
+    </div>
+
+    {j.symptoms?.length > 0 && (
+      <section class="sec" style="margin-top:0">
+        <div class="sec-h">适应症状</div>
+        <div class="sec-bd rel-list">
+          {j.symptoms.map((s: string) => <span class="pill indic">{s}</span>)}
+        </div>
+      </section>
+    )}
+
+    {j.signs?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">舌脉</div>
+        <div class="sec-bd rel-list">
+          {j.signs.map((s: string) => <span class="pill">{s}</span>)}
+        </div>
+      </section>
+    )}
+
+    {cause.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">病机与治法</div>
+        <div class="sec-bd">
+          <div class="jf-cause"><b>病机</b>{cause[0]}</div>
+          {cause[1] && <div class="jf-cause"><b>治法</b>{cause[1]}</div>}
+        </div>
+      </section>
+    )}
+
+    {j.comp?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">组成</div>
+        <div class="sec-bd">
+          <table class="jf-table">
+            <tbody>
+              {j.comp.map((c: any) => (
+                <tr>
+                  <td class="jf-herb">{c.s ? <a href={u('/herbs/' + c.s)}>{c.n}</a> : c.n}</td>
+                  <td class="jf-dose">{c.q && c.q + ' 钱'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )}
+
+    {j.medicine && (
+      <section class="sec">
+        <div class="sec-h">功效主治</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{j.medicine}</div>
+      </section>
+    )}
+
+    {j.effect?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">方解</div>
+        <div class="sec-bd"><ol class="proc-list">{j.effect.map((x: string) => <li>{x}</li>)}</ol></div>
+      </section>
+    )}
+
+    {j.analyze?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">类方辨析</div>
+        <div class="sec-bd"><ol class="proc-list">{j.analyze.map((x: string) => <li>{x}</li>)}</ol></div>
+      </section>
+    )}
+
+    {j.peers?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">类方</div>
+        <div class="sec-bd rel-list">
+          {j.peers.map((p: any) => p.s
+            ? <a class="pill" href={u('/jingfang/' + p.s)}>{p.n}</a>
+            : <span class="pill plain">{p.n}</span>)}
+        </div>
+      </section>
+    )}
+
+    {j.contra?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">禁忌</div>
+        <div class="sec-bd"><ol class="proc-list">{j.contra.map((x: string) => <li>{x}</li>)}</ol></div>
+      </section>
+    )}
+
+    <div class="feedback">本条内容有误？<a href={fb} target="_blank" rel="noopener">点此反馈</a></div>
+    <div style="margin:50px 0"><a href={u('/jingfang')}>← 返回经方类</a></div>
+  </div>
+</Base>

@@ -9,7 +9,7 @@ const GROUPS = [
   ['伤寒六经', '太阳、阳明、少阳、太阴、少阴、厥阴六经病证及经方证'],
   ['专科杂证', '妇儿、五官、皮肤等专科证候与杂病'],
 ];
-const grouped = GROUPS.map(([g, d]) => ({ g, d, items: zheng.filter((z: any) => z.group === g) }));
+const grouped = GROUPS.map(([g, d], i) => ({ g, d, i, items: zheng.filter((z: any) => z.group === g) }));
 ---
 <Base title="辨证" desc="证候辨证：纲领证候、内科证候、伤寒六经与专科杂证">
   <div class="wrap">
@@ -17,18 +17,36 @@ const grouped = GROUPS.map(([g, d]) => ({ g, d, items: zheng.filter((z: any) => 
     <p class="page-desc">共 {zheng.length} 证 · 载临床表现与病机分析 <span class="supp-tag">补充资料</span></p>
 
     <div class="toolbar">
-      <input id="q" type="search" placeholder="搜证候名…" />
+      <input id="q" type="search" placeholder="搜证候名 / 症状…" />
       <span class="count" id="count">{zheng.length} 证</span>
     </div>
 
+    <div class="zx-tabs" id="tabs">
+      {grouped.map(({ g, i, items }) => (
+        <a class="zx-tab" href={'#g' + i} data-g={i}>{g}<span>{items.length}</span></a>
+      ))}
+      <a class="zx-tab ya" href={u('/yian')}>医案 →</a>
+    </div>
+
     <div id="groups">
-      {grouped.map(({ g, d, items }) => items.length > 0 && (
-        <section class="sec zx-group">
+      {grouped.map(({ g, d, i, items }) => items.length > 0 && (
+        <section class="zx-group" id={'g' + i}>
           <div class="sec-h">{g}<span class="zx-c">{items.length}</span></div>
           <div class="zx-desc">{d}</div>
-          <div class="sec-bd rel-list">
+          <div class="zx-grid">
             {items.map((z: any) => (
-              <a class="pill zx-pill" href={u('/bianzheng/' + z.slug)} data-n={z.name}>{z.name}</a>
+              <a class="zx-card" href={u('/bianzheng/' + z.slug)} data-t={z.name + ' ' + (z.symptoms || []).join(' ')}>
+                <div class="zx-name">
+                  {z.name}
+                  <span class="zx-marks">
+                    {z.jf && <i class="zx-mark jf">方</i>}
+                    {z.case && <i class="zx-mark ya">案</i>}
+                  </span>
+                </div>
+                {z.symptoms?.length > 0 && (
+                  <div class="zx-sym">{z.symptoms.slice(0, 4).map((s: string) => <span>{s}</span>)}</div>
+                )}
+              </a>
             ))}
           </div>
         </section>
@@ -43,16 +61,16 @@ const grouped = GROUPS.map(([g, d]) => ({ g, d, items: zheng.filter((z: any) => 
     q.addEventListener('input', () => {
       const v = q.value.trim();
       let n = 0;
-      document.querySelectorAll('.zx-pill').forEach(p => {
-        const show = !v || p.dataset.n.includes(v);
-        p.style.display = show ? '' : 'none';
+      document.querySelectorAll('.zx-card').forEach(c => {
+        const show = !v || c.dataset.t.includes(v);
+        c.style.display = show ? '' : 'none';
         if (show) n++;
       });
       document.querySelectorAll('.zx-group').forEach(g => {
-        g.style.display = [...g.querySelectorAll('.zx-pill')].some(p => p.style.display !== 'none') ? '' : 'none';
+        g.style.display = [...g.querySelectorAll('.zx-card')].some(c => c.style.display !== 'none') ? '' : 'none';
       });
       empty.style.display = n ? 'none' : '';
-      count.textContent = `${n} 证`;
+      count.textContent = n + ' 证';
     });
   </script>
 </Base>

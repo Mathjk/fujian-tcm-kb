@@ -18,6 +18,8 @@ const procList = (z.process ?? '').split(/[-–—]/).map((s: string) => s.trim(
     <div class="d-meta" style="margin:-14px 0 30px">
       <span class="chip red">{z.group}</span>
       <span class="supp-tag">补充资料</span>
+      {z.jf && <a class="chip gold" href={u('/jingfang/' + z.jf)}>经方详析 →</a>}
+      {z.case && <a class="chip pine" href={u('/yian/' + z.case)}>医案 →</a>}
     </div>
 
     {z.linchuang && (

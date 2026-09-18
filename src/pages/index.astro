@@ -56,9 +56,31 @@ const dailyPool = withImg.map((h: any) => ({
         <p>按科别检索病症，每种病症汇集各书所载验方，组成剂量一目了然。</p>
         <span class="go">览 {meta.diseases} 症 →</span>
       </a>
-      <a class="card entry-card" data-mark="图" href={u('/graph')}>
+      <a class="card entry-card" data-mark="方" href={u('/formulas')}>
+        <h3>方剂总目</h3>
+        <p>六书验方千四百余首，另附伤寒经方，组成、剂量、出处页码备载。</p>
+        <span class="go">览 {meta.formulas} 方 →</span>
+      </a>
+    </div>
+    <div class="entry-grid sub">
+      <a class="card entry-card sm" data-mark="证" href={u('/bianzheng')}>
+        <h3>证候辨证</h3>
+        <p>纲领、内科、六经、专科证候，载临床表现与病机。</p>
+        <span class="go">览 {meta.zheng} 证 →</span>
+      </a>
+      <a class="card entry-card sm" data-mark="案" href={u('/yian')}>
+        <h3>内科医案</h3>
+        <p>证候所系医案：症状、治法、方药与随症加减。</p>
+        <span class="go">览 {meta.yian} 案 →</span>
+      </a>
+      <a class="card entry-card sm" data-mark="药" href={u('/chengyao')}>
+        <h3>中成药</h3>
+        <p>常用成药组成、功效、适用证候与用药辨析。</p>
+        <span class="go">览 {meta.patents} 种 →</span>
+      </a>
+      <a class="card entry-card sm" data-mark="图" href={u('/graph')}>
         <h3>知识图谱</h3>
-        <p>草药与病症织成网络：某药治某症、某症用某方，循线可穷其牵连。</p>
+        <p>草药与病症织成网络，循线可穷其牵连。</p>
         <span class="go">观 {meta.edges} 缘 →</span>
       </a>
     </div>

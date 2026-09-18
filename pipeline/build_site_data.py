@@ -593,6 +593,111 @@ if _mp.exists() or _mz.exists():
                 hh.setdefault("patents", []).append({"n": p["name"], "s": p["slug"]})
     print("unmatched patent tokens:", unmatched_tok.most_common(15))
 
+
+# ---------- supplementary: 经方类 & 内科医案 ----------
+def _strip_wt(s):
+    return re.sub(r"^[A-Z]\d*", "", s).strip()
+
+def _slot_list(r, prefix, n):
+    out = []
+    for i in range(n):
+        for s in re.split(r"[-*]", r.get(f"{prefix}{i:02d}") or ""):
+            s = _strip_wt(s)
+            if s and s not in out:
+                out.append(s)
+    return out
+
+def _dash_list(s):
+    return [x.strip() for x in (s or "").split("-") if x.strip()]
+
+def _yslug(name, used, fallback):
+    s = re.sub(r'[\\/\?%*:|"<>#&=+．。()（）\[\]【】,，、;；:：\s]+', "-", name).strip("-") or fallback
+    base_s, i = s, 2
+    while s in used:
+        s = f"{base_s}-{i}"; i += 1
+    used.add(s)
+    return s
+
+def _herb_link(tok):
+    base = re.sub(r"[（(].*?[)）]", "", tok).strip()
+    hid = hid_of.get(norm(base))
+    return {"n": tok, "s": hslug_of.get(hid)}
+
+zname2slug = {z["name"]: z["slug"] for z in zheng_out}
+jingfang_out, yian_out = [], []
+_jf = ROOT / "supp_data" / "json" / "伤寒论症状.json"
+if _jf.exists():
+    used_j = set()
+    for r in json.loads(_jf.read_text()):
+        name = r["zheng"].strip()
+        team, qty = _dash_list(r.get("team")), _dash_list(r.get("quantity"))
+        comp = []
+        for k, tk in enumerate(team):
+            lk = _herb_link(tk)
+            lk["q"] = qty[k] if k < len(qty) else ""
+            comp.append(lk)
+        peers = []
+        for p in re.split(r"[-*]", r.get("peer") or ""):
+            p = p.strip()
+            if p and p not in peers:
+                peers.append(p)
+        jingfang_out.append({
+            "name": name, "slug": _yslug(name, used_j, "f"),
+            "symptoms": _slot_list(r, "s", 7),
+            "signs": _slot_list(r, "w", 6),
+            "cause": _dash_list(r.get("cause")),
+            "medicine": r.get("medicine", ""),
+            "effect": _dash_list(r.get("effect")),
+            "analyze": _dash_list(r.get("analyze")),
+            "contra": _dash_list(r.get("not")),
+            "peers": peers, "comp": comp,
+            "zslug": zname2slug.get(name),
+        })
+    jname2slug = {j["name"]: j["slug"] for j in jingfang_out}
+    for j in jingfang_out:
+        j["peers"] = [{"n": p, "s": jname2slug.get(p)} for p in j["peers"]]
+    for z in zheng_out:
+        if z["name"] in jname2slug:
+            z["jf"] = jname2slug[z["name"]]
+
+_yn = ROOT / "supp_data" / "json" / "内科症状.json"
+if _yn.exists():
+    jname2slug = {j["name"]: j["slug"] for j in jingfang_out}
+    used_y = set()
+    for r in json.loads(_yn.read_text()):
+        full = r["zheng"].strip()
+        name = re.sub(r"^内科", "", full)
+        blocks = []
+        for bi in (1, 2):
+            rows = _dash_list(r.get(f"yao{bi}"))
+            jies = _dash_list(r.get(f"jie{bi}"))
+            for k, row in enumerate(rows):
+                herbs = [_herb_link(tk) for tk in row.split("*") if tk.strip()]
+                blocks.append({"herbs": herbs, "jie": jies[k] if k < len(jies) else ""})
+        prevs, jjs, posts = (_dash_list(r.get("prev")), _dash_list(r.get("jiajian")),
+                             _dash_list(r.get("post")))
+        jia = []
+        for k, pr in enumerate(prevs):
+            herbs = [_herb_link(tk) for tk in (jjs[k].split("*") if k < len(jjs) else []) if tk.strip()]
+            jia.append({"when": pr, "herbs": herbs, "why": posts[k] if k < len(posts) else ""})
+        yian_out.append({
+            "name": name, "full": full,
+            "slug": _yslug(name, used_y, "y"),
+            "zslug": zname2slug.get(name),
+            "symptoms": _slot_list(r, "s", 7),
+            "signs": _slot_list(r, "w", 6),
+            "jian": _dash_list(r.get("jian")),
+            "zhi": r.get("zhi", ""),
+            "fangji": [{"n": f, "s": jname2slug.get(f)} for f in _dash_list(r.get("fangji"))],
+            "blocks": blocks,
+            "extra_jie": _dash_list(r.get("jie3")) + _dash_list(r.get("jie4")),
+            "jia": jia,
+        })
+    _z_by_slug = {z["slug"]: z for z in zheng_out}
+    for y in yian_out:
+        if y["zslug"] in _z_by_slug:
+            _z_by_slug[y["zslug"]]["case"] = y["slug"]
+
 # ---------- graph ----------
 # per-disease top herbs (for tooltip) — count occurrences across its formulas
 disease_herb_freq = defaultdict(Counter)
@@ -749,6 +854,12 @@ for g in glossary_out:
 for p in patent_out:
     search.append({"t": "c", "n": p["name"], "s": p["slug"],
                    "k": " ".join([z["n"] for z in p["zheng"]] + [p.get("func", "")[:200]])})
+for j in jingfang_out:
+    search.append({"t": "j", "n": j["name"], "s": j["slug"],
+                   "k": " ".join([j.get("medicine", "")[:200]] + j["symptoms"])})
+for y in yian_out:
+    search.append({"t": "y", "n": y["name"], "s": y["slug"],
+                   "k": " ".join([y["zhi"]] + y["symptoms"] + [f["n"] for f in y["fangji"]])})
 
 meta = {
     "title": "闽本草",
@@ -758,6 +869,7 @@ meta = {
     "english": en_hits, "zhushi": supp_hits,
     "zheng": len(zheng_out), "glossary": len(glossary_out),
     "patents": len(patent_out),
+    "jingfang": len(jingfang_out), "yian": len(yian_out),
     "skipped_junk": skipped,
 }
 
@@ -767,6 +879,8 @@ meta = {
 (SD / "zhengxing.json").write_text(json.dumps(zheng_out, ensure_ascii=False))
 (SD / "glossary.json").write_text(json.dumps(glossary_out, ensure_ascii=False))
 (SD / "patent.json").write_text(json.dumps(patent_out, ensure_ascii=False))
+(SD / "jingfang.json").write_text(json.dumps(jingfang_out, ensure_ascii=False))
+(SD / "yian.json").write_text(json.dumps(yian_out, ensure_ascii=False))
 (SD / "graph.json").write_text(json.dumps(graph, ensure_ascii=False))
 (SD / "search.json").write_text(json.dumps(search, ensure_ascii=False))
 (SD / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))

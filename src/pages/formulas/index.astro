@@ -3,6 +3,7 @@ import Base from '../../layouts/Base.astro';
 import { u, BOOK_SHORT } from '../../utils/url';
 import diseases from '../../data/diseases.json';
 import formulas from '../../data/formulas.json';
+import jingfang from '../../data/jingfang.json';
 import meta from '../../data/meta.json';
 
 const byDisease = new Map<string, any[]>();
@@ -18,7 +19,20 @@ const books = [...new Set(formulas.map((f: any) => f.book))];
 <Base title="方剂" desc="各书验方按病症汇总">
   <div class="wrap">
     <h1 class="page-title">方剂总目</h1>
-    <p class="page-desc">共 {meta.formulas} 首 · 按主治病症归并 · 点击入病症页详览</p>
+    <p class="page-desc">验方 {meta.formulas} 首 · 经方 {jingfang.length} 首 · 按主治病症归并</p>
+
+    <section class="sec zx-group" style="margin-top:0">
+      <div class="sec-h">经方类<span class="zx-c">{jingfang.length}</span><a class="sec-more" href={u('/jingfang')}>全部经方 →</a></div>
+      <div class="zx-desc">伤寒六经类方，载组成剂量、方解与类方辨析 <span class="supp-tag">补充资料</span></div>
+      <div class="sec-bd rel-list">
+        {jingfang.map((j: any) => (
+          <a class="pill" href={u('/jingfang/' + j.slug)}>{j.name}</a>
+        ))}
+      </div>
+    </section>
+
+    <div class="sec-h" style="margin-top:36px">验方类<span class="zx-c">{meta.formulas}</span></div>
+    <div class="zx-desc" style="margin-bottom:14px">六书所载验方，按主治病症归并，点击入病症页详览</div>
     <div class="toolbar">
       <input id="q" type="search" placeholder="搜病症 / 药味…" />
       <select id="bk"><option value="">全部出处</option>{books.map(b => <option value={b}>{BOOK_SHORT[b] ?? b}</option>)}</select>

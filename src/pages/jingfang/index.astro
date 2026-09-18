@@ -1,0 +1,44 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../utils/url';
+import jingfang from '../../data/jingfang.json';
+---
+<Base title="经方" desc="伤寒六经类方六十四首：组成剂量、方解、类方辨析">
+  <div class="wrap">
+    <h1 class="page-title">经方类</h1>
+    <p class="page-desc">共 {jingfang.length} 首 · 伤寒六经类方 · 组成剂量、方解与类方辨析 <span class="supp-tag">补充资料</span></p>
+
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="搜方名 / 药味 / 主治…" />
+      <span class="count" id="count">{jingfang.length} 方</span>
+    </div>
+
+    <div class="gl-grid" id="grid">
+      {jingfang.map((j: any) => (
+        <a class="card cy-card" href={u('/jingfang/' + j.slug)}
+           data-t={j.name + ' ' + j.medicine + ' ' + j.comp.map((c: any) => c.n).join(' ')}>
+          <div class="gl-name">{j.name}</div>
+          <div class="cy-zheng">{j.comp.map((c: any) => c.n).join(' · ')}</div>
+          <div class="gl-desc">{j.medicine.slice(0, 60)}</div>
+        </a>
+      ))}
+    </div>
+    <div class="empty" id="empty" style="display:none">无相应方剂</div>
+  </div>
+
+  <script>
+    const q = document.getElementById('q'), count = document.getElementById('count'),
+          empty = document.getElementById('empty');
+    q.addEventListener('input', () => {
+      const v = q.value.trim();
+      let n = 0;
+      document.querySelectorAll('.cy-card').forEach(c => {
+        const show = !v || c.dataset.t.includes(v);
+        c.style.display = show ? '' : 'none';
+        if (show) n++;
+      });
+      empty.style.display = n ? 'none' : '';
+      count.textContent = n + ' 方';
+    });
+  </script>
+</Base>

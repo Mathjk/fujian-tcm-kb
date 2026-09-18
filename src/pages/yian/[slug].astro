@@ -1,0 +1,111 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../utils/url';
+import yian from '../../data/yian.json';
+
+export function getStaticPaths() {
+  return yian.map((y: any) => ({ params: { slug: y.slug }, props: { y } }));
+}
+const { y } = Astro.props;
+const fb = 'https://github.com/Mathjk/fujian-tcm-kb/issues/new?title='
+  + encodeURIComponent('[纠错] 医案：' + y.name)
+  + '&body=' + encodeURIComponent('条目：' + y.full + '\n页面：/yian/' + y.slug + '\n\n问题描述：');
+---
+<Base title={y.name} desc="内科医案 · 辨证论治">
+  <div class="wrap">
+    <h1 class="page-title">{y.name} <span style="font-size:16px;color:var(--ink-3);font-weight:400">医案</span></h1>
+    <div class="d-meta" style="margin:-14px 0 30px">
+      <span class="chip red">医案</span>
+      <span class="supp-tag">补充资料</span>
+      {y.zslug && <a class="chip gold" href={u('/bianzheng/' + y.zslug)}>证候详析 →</a>}
+    </div>
+
+    {y.symptoms?.length > 0 && (
+      <section class="sec" style="margin-top:0">
+        <div class="sec-h">症状</div>
+        <div class="sec-bd rel-list">
+          {y.symptoms.map((s: string) => <span class="pill indic">{s}</span>)}
+        </div>
+      </section>
+    )}
+
+    {y.signs?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">舌脉</div>
+        <div class="sec-bd rel-list">
+          {y.signs.map((s: string) => <span class="pill">{s}</span>)}
+        </div>
+      </section>
+    )}
+
+    {y.jian?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">问诊参考</div>
+        <div class="sec-bd"><ol class="proc-list">{y.jian.map((x: string) => <li>{x}</li>)}</ol></div>
+      </section>
+    )}
+
+    {y.zhi && (
+      <section class="sec">
+        <div class="sec-h">治法</div>
+        <div class="sec-bd" style="font-size:17px;color:var(--pine-2);font-family:var(--kai)">{y.zhi}</div>
+      </section>
+    )}
+
+    {y.fangji?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">备选方剂</div>
+        <div class="sec-bd rel-list">
+          {y.fangji.map((f: any) => f.s
+            ? <a class="pill" href={u('/jingfang/' + f.s)}>{f.n}</a>
+            : <span class="pill plain">{f.n}</span>)}
+        </div>
+      </section>
+    )}
+
+    {y.blocks?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">主方与方解</div>
+        <div class="sec-bd">
+          {y.blocks.map((b: any) => (
+            <div class="ya-row">
+              <div class="ya-herbs">
+                {b.herbs.map((h: any) => h.s
+                  ? <a class="pill" href={u('/herbs/' + h.s)}>{h.n}</a>
+                  : <span class="pill plain">{h.n}</span>)}
+              </div>
+              {b.jie && <div class="ya-jie">{b.jie}</div>}
+            </div>
+          ))}
+          {y.extra_jie?.length > 0 && (
+            <ol class="proc-list" style="margin-top:10px">
+              {y.extra_jie.map((x: string) => <li>{x}</li>)}
+            </ol>
+          )}
+        </div>
+      </section>
+    )}
+
+    {y.jia?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">随症加减</div>
+        <div class="sec-bd">
+          {y.jia.map((a: any) => (
+            <div class="ya-row">
+              <div class="ya-when">{a.when}</div>
+              <div class="ya-herbs">
+                {a.herbs.map((h: any) => h.s
+                  ? <a class="pill" href={u('/herbs/' + h.s)}>{h.n}</a>
+                  : <span class="pill plain">{h.n}</span>)}
+              </div>
+              {a.why && <div class="ya-jie">{a.why}</div>}
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <div class="feedback">本条内容有误？<a href={fb} target="_blank" rel="noopener">点此反馈</a></div>
+    <div style="margin:50px 0"><a href={u('/yian')}>← 返回医案</a></div>
+  </div>
+</Base>
