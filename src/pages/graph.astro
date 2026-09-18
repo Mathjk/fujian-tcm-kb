@@ -12,16 +12,20 @@ import Base from '../layouts/Base.astro';
           <label><input type="checkbox" id="showD" checked /> 病症节点</label>
           <label><input type="checkbox" id="relTreat" checked /> 「组方治疗」边</label>
           <label><input type="checkbox" id="relIndic" checked /> 「主治」边</label>
-          <label><input type="checkbox" id="picMode" /> 图片节点</label>
         </div>
       </div>
       <div class="panel" style="display:flex;gap:6px">
         <button class="chip" id="layNet" style="cursor:pointer;border-color:var(--cinnabar);color:var(--cinnabar)">网状</button>
         <button class="chip" id="layBi" style="cursor:pointer">二分</button>
       </div>
+      <div class="panel" id="focusBar" style="display:none;align-items:center;gap:8px">
+        <span id="focusName" style="font-size:13px;color:var(--ink-1)"></span>
+        <button class="chip" id="focusExit" style="cursor:pointer">退出聚焦</button>
+      </div>
       <div class="panel graph-legend">
-        <span><i class="dot" style="background:#3f5d46"></i>草药</span>
-        <span><i class="dot" style="background:#b23a24"></i>病症</span>
+        <span><i class="dot" style="background:#3f5d46"></i>草药（按功效分色）</span>
+        <span><i class="dot" style="background:#b23a24"></i>病症（按科别分色）</span>
+        <span style="font-size:11px;color:var(--ink-3)">单击聚焦邻域 · 双击进入详情</span>
       </div>
     </div>
   </div>
@@ -34,14 +38,22 @@ import Base from '../layouts/Base.astro';
     chart.showLoading({ text: '图谱加载中…', color: '#b23a24', textColor: '#57503f', maskColor: 'rgba(246,241,229,.7)' });
 
     let DATA = null;
-    let layout = 'net';          // 'net' | 'bi'
-    let picMode = false;
-    let autoPic = false;         // zoom-triggered
+    let ADJ = new Map();            // id -> Set(neighbor ids)
+    let layout = 'net';
+    let tier = 0;                   // 0 far | 1 mid | 2 close
+    let focusId = null;
+
+    // muted chinese palette
+    const HERB_PAL = ['#3f5d46','#527a4f','#6b7a3f','#3f7a6b','#5a6b8a','#8a6b3f','#4f6b7a','#7a5a8a'];
+    const DIS_PAL  = ['#b23a24','#c05a2e','#a34a3a','#c07a2e','#8a3a4a','#b26a24','#9a4a2e','#7a3a3a'];
+    const hash = s => { let h = 0; for (const c of s || '') h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
+    const colorOf = n => (n.type === 'herb' ? HERB_PAL : DIS_PAL)[hash(n.cat) % 8];
 
     const esc = s => (s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
     function tip(p) {
       const d = p.data;
+      const url = `${BASE}${d.type === 'herb' ? '/herbs/' : '/diseases/'}${d.slug}`;
       if (d.type === 'herb') {
         const img = d.img ? `<img src="${BASE}/img/${d.img}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:6px">` : '';
         return `<div style="max-width:240px">${img}
@@ -49,56 +61,69 @@ import Base from '../layouts/Base.astro';
           <span style="color:#8a7f66;font-size:12px"> · ${esc(d.cat || '草药')}</span><br/>
           ${d.xw ? `<div style="color:#57503f;font-size:12.5px;margin-top:2px"><b style="color:#a5823c">性味</b> ${esc(d.xw)}</div>` : ''}
           ${d.fn ? `<div style="color:#57503f;font-size:12.5px;margin-top:2px"><b style="color:#a5823c">主治</b> ${esc(d.fn)}…</div>` : ''}
-          <div style="color:#8a7f66;font-size:11px;margin-top:4px">${d.deg} 条关联 · 点击查看详情</div></div>`;
+          <div style="margin-top:6px"><a href="${url}" style="color:#b23a24;font-size:12px">查看详情 →</a>
+          <span style="color:#8a7f66;font-size:11px;margin-left:8px">${d.deg} 条关联</span></div></div>`;
       }
       return `<div style="max-width:220px"><b style="font-size:15px">${esc(d.name)}</b>
         <span style="color:#8a7f66;font-size:12px"> · ${esc(d.cat || '病症')}</span><br/>
         <div style="color:#57503f;font-size:12.5px;margin-top:2px">验方 ${d.fc ?? 0} 首 · ${d.deg} 条关联</div>
         ${d.top?.length ? `<div style="color:#57503f;font-size:12px;margin-top:3px">常用药：${esc(d.top.join('、'))}</div>` : ''}
-        <div style="color:#8a7f66;font-size:11px;margin-top:4px">点击查看详情</div></div>`;
+        <div style="margin-top:6px"><a href="${url}" style="color:#b23a24;font-size:12px">查看详情 →</a></div></div>`;
     }
 
-    function nodeSym(n, zoomed) {
-      if ((picMode || zoomed) && n.type === 'herb' && n.img)
-        return 'image://' + BASE + '/img/' + n.img;
-      return 'circle';
-    }
+    const degLabel = d => tier === 2 ? d.deg > 2 : tier === 1 ? d.deg > 10 : d.deg > 28;
+    const usePic = n => tier === 2 && n.type === 'herb' && n.img;
 
-    function buildNodes(zoomed) {
+    function buildNodes() {
       const showH = document.getElementById('showH').checked;
       const showD = document.getElementById('showD').checked;
-      const keep = n => (n.type === 'herb' ? showH : showD);
-      return DATA.nodes.filter(keep).map(n => ({
-        id: n.id, name: n.name, slug: n.slug, type: n.type,
-        img: n.img, xw: n.xw, fn: n.fn, fc: n.fc, top: n.top, cat: n.cat, deg: n.deg,
-        x: layout === 'net' ? n.x : n.bx,
-        y: layout === 'net' ? n.y : n.by,
-        fixed: true,
-        symbol: nodeSym(n, zoomed),
-        symbolSize: (picMode || zoomed) && n.type === 'herb' && n.img
-          ? Math.min(44, 18 + Math.sqrt(n.deg) * 4)
-          : Math.min(24, 6 + Math.sqrt(n.deg) * 2.2),
-        symbolKeepAspect: true,
-        itemStyle: { color: n.type === 'herb' ? '#3f5d46' : '#b23a24', borderColor: '#f6f1e5', borderWidth: 1.5 },
-        label: {
-          show: (picMode || zoomed) ? n.deg > 4 : n.deg > 16,
-          position: 'bottom', fontSize: 11, color: '#2c2820',
-          fontFamily: 'Songti SC, STSong, SimSun, serif',
-        },
-      }));
+      const fs = focusId ? new Set([focusId, ...ADJ.get(focusId) || []]) : null;
+      return DATA.nodes.filter(n => (n.type === 'herb' ? showH : showD)).map(n => {
+        const dim = fs && !fs.has(n.id);
+        return {
+          id: n.id, name: n.name, slug: n.slug, type: n.type,
+          img: n.img, xw: n.xw, fn: n.fn, fc: n.fc, top: n.top, cat: n.cat, deg: n.deg,
+          x: layout === 'net' ? n.x : n.bx,
+          y: layout === 'net' ? n.y : n.by,
+          fixed: true,
+          symbol: usePic(n) ? 'image://' + BASE + '/img/' + n.img : 'circle',
+          symbolSize: usePic(n) ? Math.min(46, 20 + Math.sqrt(n.deg) * 5)
+                                : Math.min(26, 7 + Math.sqrt(n.deg) * 2.4),
+          symbolKeepAspect: true,
+          itemStyle: {
+            color: colorOf(n),
+            borderColor: n.id === focusId ? '#b23a24' : '#f6f1e5',
+            borderWidth: n.id === focusId ? 3 : 1.6,
+            shadowBlur: dim ? 0 : 7, shadowColor: 'rgba(80,60,30,.28)', shadowOffsetY: 1.5,
+            opacity: dim ? 0.07 : 1,
+          },
+          label: {
+            show: !dim && degLabel(n),
+            position: 'bottom', fontSize: 11.5, color: '#2c2820',
+            fontFamily: 'Songti SC, STSong, SimSun, serif',
+            textBorderColor: '#f6f1e5', textBorderWidth: 3,
+          },
+        };
+      });
     }
 
     let lastNodes = [];
-    function rebuild(zoomed = false) {
+    function rebuild() {
       const rT = document.getElementById('relTreat').checked;
       const rI = document.getElementById('relIndic').checked;
-      const nodes = buildNodes(zoomed);
+      const nodes = buildNodes();
       lastNodes = nodes;
       const ids = new Set(nodes.map(n => n.id));
-      const links = DATA.links.filter(l =>
-        ids.has(l.source) && ids.has(l.target) && (l.rel === '组方治疗' ? rT : rI));
+      const links = DATA.links
+        .filter(l => ids.has(l.source) && ids.has(l.target) && (l.rel === '组方治疗' ? rT : rI))
+        .map(l => {
+          const hot = focusId && (l.source === focusId || l.target === focusId);
+          const dim = focusId && !hot;
+          return { ...l, lineStyle: { opacity: dim ? 0.03 : hot ? 0.85 : 0.28,
+                                      width: hot ? 1.6 : 0.9, color: 'source' } };
+        });
       chart.setOption({
-        animationDurationUpdate: 600,
+        animation: false,
         tooltip: {
           formatter: tip, enterable: true, confine: true,
           backgroundColor: 'rgba(251,247,238,.97)', borderColor: '#d9cdb4',
@@ -107,23 +132,41 @@ import Base from '../layouts/Base.astro';
         series: [{
           type: 'graph', layout: 'none', roam: true, draggable: true,
           nodes, links,
-          lineStyle: { color: '#c9ba9c', width: 1, opacity: .5, curveness: 0.06 },
-          emphasis: { focus: 'adjacency', lineStyle: { color: '#b23a24', width: 2, opacity: .9 }, label: { show: true, fontSize: 13, fontWeight: 'bold' } },
-          scaleLimit: { min: 0.12, max: 10 },
-          progressive: 400,
+          emphasis: { focus: 'adjacency',
+                      lineStyle: { width: 2, opacity: .9 },
+                      label: { show: true, fontSize: 13, fontWeight: 'bold' } },
+          scaleLimit: { min: 0.08, max: 12 },
+          progressive: 500,
         }],
       }, { replaceMerge: ['series'] });
     }
 
+    function setFocus(id) {
+      focusId = id;
+      const bar = document.getElementById('focusBar');
+      if (id) {
+        bar.style.display = 'flex';
+        document.getElementById('focusName').textContent =
+          '聚焦：' + (DATA.nodes.find(n => n.id === id)?.name || '');
+      } else {
+        bar.style.display = 'none';
+      }
+      rebuild();
+    }
+    document.getElementById('focusExit').onclick = () => setFocus(null);
+
     fetch(BASE + '/data/graph.json').then(r => r.json()).then(g => {
       DATA = g;
+      for (const l of g.links) {
+        (ADJ.get(l.source) || ADJ.set(l.source, new Set()).get(l.source)).add(l.target);
+        (ADJ.get(l.target) || ADJ.set(l.target, new Set()).get(l.target)).add(l.source);
+      }
       chart.hideLoading();
       rebuild();
     });
 
     ['showH', 'showD', 'relTreat', 'relIndic'].forEach(id =>
-      document.getElementById(id).addEventListener('change', () => rebuild(autoPic)));
-    document.getElementById('picMode').addEventListener('change', e => { picMode = e.target.checked; rebuild(picMode); });
+      document.getElementById(id).addEventListener('change', rebuild));
 
     const btnN = document.getElementById('layNet'), btnB = document.getElementById('layBi');
     function setLayout(m) {
@@ -132,47 +175,50 @@ import Base from '../layouts/Base.astro';
         b.style.borderColor = on ? 'var(--cinnabar)' : '';
         b.style.color = on ? 'var(--cinnabar)' : '';
       }
-      rebuild(autoPic);
+      rebuild();
     }
     btnN.onclick = () => setLayout('net');
     btnB.onclick = () => setLayout('bi');
 
-    // zoom -> auto switch to image nodes
+    // zoom -> label density / image nodes
     let roamT = null;
     chart.on('graphRoam', () => {
       clearTimeout(roamT);
       roamT = setTimeout(() => {
         const z = chart.getOption().series?.[0]?.zoom ?? 1;
-        const want = z >= 2.2;
-        if (want !== autoPic) { autoPic = want; rebuild(autoPic); }
-      }, 180);
+        const t = z >= 2.4 ? 2 : z >= 1.1 ? 1 : 0;
+        if (t !== tier) { tier = t; rebuild(); }
+      }, 160);
     });
 
-    // search -> focus
-    let lastHi = null;
+    // click focus / dblclick navigate
+    let clickT = null;
+    chart.on('click', p => {
+      if (p.dataType !== 'node') return;
+      clearTimeout(clickT);
+      clickT = setTimeout(() => setFocus(p.data.id === focusId ? null : p.data.id), 220);
+    });
+    chart.on('dblclick', p => {
+      clearTimeout(clickT);
+      if (p.dataType === 'node' && p.data.slug)
+        location.href = BASE + (p.data.type === 'herb' ? '/herbs/' : '/diseases/') + p.data.slug;
+    });
+
+    // search -> focus + tip
     document.getElementById('gq').addEventListener('input', e => {
       const v = e.target.value.trim();
-      if (!DATA) return;
-      if (lastHi) chart.dispatchAction({ type: 'downplay', seriesIndex: 0, name: lastHi });
-      if (!v) return;
+      if (!DATA || !v) return;
       const n = DATA.nodes.find(n => n.name === v) || DATA.nodes.find(n => n.name.includes(v));
-      if (n) {
-        lastHi = n.name;
-        const di = lastNodes.findIndex(x => x.id === n.id);
-        if (di < 0) return;
-        chart.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: di });
-        chart.dispatchAction({ type: 'focusNodeAdjacency', seriesIndex: 0, dataIndex: di });
-        const x = layout === 'net' ? n.x : n.bx, y = layout === 'net' ? n.y : n.by;
-        const pt = chart.convertToPixel({ seriesIndex: 0 }, [x, y]);
+      if (!n) return;
+      setFocus(n.id);
+      const di = lastNodes.findIndex(x => x.id === n.id);
+      if (di >= 0) {
+        const pt = chart.convertToPixel({ seriesIndex: 0 },
+          [layout === 'net' ? n.x : n.bx, layout === 'net' ? n.y : n.by]);
         chart.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: di, position: pt });
       }
     });
 
-    chart.on('click', p => {
-      if (p.dataType === 'node' && p.data.slug) {
-        location.href = BASE + (p.data.type === 'herb' ? '/herbs/' : '/diseases/') + p.data.slug;
-      }
-    });
     window.addEventListener('resize', () => chart.resize());
   </script>
 </Base>

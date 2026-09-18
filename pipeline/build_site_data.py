@@ -388,12 +388,15 @@ if nx is not None:
     # only layout the connected part; isolates go on a ring
     comps = sorted(nx.connected_components(G), key=len, reverse=True)
     main = comps[0] if comps else set()
-    pos_spring = norm_scale(nx.spring_layout(G.subgraph(main), seed=42, k=None, iterations=100), 1400)
+    try:
+        pos_spring = norm_scale(nx.kamada_kawai_layout(G.subgraph(main)), 2400)
+    except Exception:
+        pos_spring = norm_scale(nx.spring_layout(G.subgraph(main), seed=42, k=0.8, iterations=150), 2400)
     # ring for isolated nodes
     iso = [n["id"] for n in nodes if n["id"] not in main]
     for i, nid in enumerate(iso):
         a = 2 * math.pi * i / max(1, len(iso))
-        pos_spring[nid] = (820 * math.cos(a), 820 * math.sin(a))
+        pos_spring[nid] = (1350 * math.cos(a), 1350 * math.sin(a))
 else:
     # fallback: concentric by degree
     hh = sorted(herb_ids, key=lambda x: -len(adj[x]))
@@ -421,11 +424,11 @@ def barycentric(rows_a, rows_b):
 ha = [h for h in sorted(herb_ids, key=lambda x: -len(adj[x]))]
 db = [d for d in sorted(dis_ids, key=lambda x: -len(adj[x]))]
 pa, pb = barycentric(ha, db)
-span = max(len(ha), len(db))
+W = max(len(ha), len(db)) * 9.5   # ~9.5px per node so rows stay readable
 for h, i in pa.items():
-    pos_bi[h] = ((i - len(pa) / 2) * (1500 / span), -300.0)
+    pos_bi[h] = ((i - len(pa) / 2) * (W / len(pa)), -320.0)
 for d, i in pb.items():
-    pos_bi[d] = ((i - len(pb) / 2) * (1500 / span), 300.0)
+    pos_bi[d] = ((i - len(pb) / 2) * (W / len(pb)), 320.0)
 
 for n in nodes:
     x, y = pos_spring.get(n["id"], (0, 0))
