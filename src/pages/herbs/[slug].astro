@@ -42,7 +42,9 @@ const bookCount = herb.books?.length ?? 0;
       </div>
       <div>
         <h1 class="d-name">{herb.name}</h1>
+        {herb.pinyin && <div class="d-py">{herb.pinyin}</div>}
         {herb.latin && <div class="d-latin">{herb.latin}</div>}
+        {herb.en && <div class="d-en">{herb.en}</div>}
         <div class="d-meta">
           {herb.family && <span class="chip pine">{herb.family}</span>}
           {herb.category && <span class="chip gold">{herb.category}</span>}

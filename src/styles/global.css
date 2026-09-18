@@ -199,7 +199,9 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hi); border
 .gallery-thumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); cursor: pointer; }
 .gallery-thumbs img.on { outline: 2px solid var(--cinnabar); }
 .d-name { font-size: 38px; font-weight: 700; letter-spacing: .12em; margin: 0; }
+.d-py { color: var(--gold); margin-top: 6px; font-size: 15px; letter-spacing: .06em; font-family: var(--kai); }
 .d-latin { font-style: italic; color: var(--ink-3); margin-top: 4px; font-size: 15px; }
+.d-en { color: var(--ink-3); margin-top: 2px; font-size: 13px; letter-spacing: .03em; }
 .d-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .d-aliases { margin-top: 14px; font-size: 14px; color: var(--ink-2); }
 .d-aliases b { color: var(--gold); font-family: var(--kai); font-weight: 400; letter-spacing: .1em; margin-right: 6px; }

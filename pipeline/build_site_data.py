@@ -184,6 +184,70 @@ for stub, tgt in merge_to.items():
     if t and stub not in t["aliases"]:
         t["aliases"].append(stub)
 
+# ---------- pinyin & english ----------
+import unicodedata
+from pypinyin import pinyin as _py, Style
+
+zh_en_path = ROOT / "data" / "zh_en_map.json"
+zh_en = json.loads(zh_en_path.read_text()) if zh_en_path.exists() else {}
+
+
+def _toneless(s):
+    return "".join(c for c in unicodedata.normalize("NFKD", s)
+                   if not unicodedata.combining(c)).replace("ü", "v").lower()
+
+
+def _pick_reading(name, ref):
+    """Per-char tone syllables whose plain forms concatenate to ref (fixes heteronyms)."""
+    cand = _py(name, style=Style.NORMAL, heteronym=True)
+    tones = _py(name, style=Style.TONE, heteronym=True)
+    seq = []
+
+    def dfs(i, acc):
+        if i == len(cand):
+            return acc == ref
+        for alt in cand[i]:
+            a = alt.lower().replace("u:", "v").replace("ü", "v")
+            if ref.startswith(acc + a):
+                tv = next((t for t in tones[i] if _toneless(t) == a), alt)
+                seq.append(tv)
+                if dfs(i + 1, acc + a):
+                    return True
+                seq.pop()
+        return False
+
+    return seq if dfs(0, "") else None
+
+
+def pinyin_of(name):
+    rec = zh_en.get(name)
+    ref = re.sub(r"[^a-zvü:]", "", (rec or {}).get("py", "").lower().replace("u:", "v"))
+    if ref:
+        seq = _pick_reading(name, ref)
+        if seq:
+            return " ".join(seq).capitalize()
+    return " ".join(s[0] for s in _py(name, style=Style.TONE)).capitalize()
+
+
+def pinyin_plain(name):
+    return "".join(s[0] for s in _py(name, style=Style.NORMAL)).lower()
+
+
+def english_of(h):
+    for key in [h["name"], *h["aliases"]]:
+        rec = zh_en.get(key)
+        if rec and rec.get("en"):
+            return rec["en"]
+    return ""
+
+
+en_hits = 0
+for h in herbs_out:
+    h["pinyin"] = pinyin_of(h["name"])
+    h["py"] = pinyin_plain(h["name"])
+    h["en"] = english_of(h)
+    en_hits += bool(h["en"])
+
 hid_of = {}   # normalized name -> herb id
 for h in herbs_out:
     hid_of[norm(h["name"])] = h["id"]
@@ -467,16 +531,20 @@ graph = {"nodes": nodes, "links": links}
 # ---------- search ----------
 search = []
 for h in herbs_out:
-    kw = " ".join(h["aliases"] + [h["latin"], h["family"], h["category"]])
+    kw = " ".join(h["aliases"] + [h["latin"], h["family"], h["category"],
+                                h.get("py", ""), h.get("pinyin", ""), h.get("en", "")])
     search.append({"t": "h", "n": h["name"], "s": h["slug"], "k": kw})
 for d in diseases_out:
-    search.append({"t": "d", "n": d["name"], "s": d["slug"], "k": d["category"]})
+    dpy = pinyin_plain(d["name"])
+    search.append({"t": "d", "n": d["name"], "s": d["slug"],
+                   "k": d["category"] + " " + dpy})
 
 meta = {
     "title": "闽本草",
     "herbs": len(herbs_out), "diseases": len(diseases_out),
     "formulas": len(formulas_out), "edges": len(links),
     "images": sum(len(h["images"]) for h in herbs_out),
+    "english": en_hits,
     "skipped_junk": skipped,
 }
 

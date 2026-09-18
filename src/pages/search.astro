@@ -20,7 +20,12 @@ import { u } from '../utils/url';
     function render() {
       const v = q.value.trim();
       if (!v || !idx) { box.innerHTML = ''; return; }
-      const hits = idx.filter(e => e.n.includes(v) || (e.k && e.k.includes(v))).slice(0, 80);
+      const vl = v.toLowerCase(), vs = vl.replace(/\s+/g, '');
+      const hits = idx.filter(e =>
+        e.n.includes(v) ||
+        (e.k && (e.k.toLowerCase().includes(vl) ||
+                 e.k.toLowerCase().replace(/\s+/g, '').includes(vs)))
+      ).slice(0, 80);
       if (!hits.length) { box.innerHTML = '<div class="empty">查无此条</div>'; return; }
       const groups = {};
       hits.forEach(h => (groups[h.t] ??= []).push(h));
