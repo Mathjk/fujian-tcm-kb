@@ -593,6 +593,20 @@ if _mp.exists() or _mz.exists():
                 hh.setdefault("patents", []).append({"n": p["name"], "s": p["slug"]})
     print("unmatched patent tokens:", unmatched_tok.most_common(15))
 
+# ---------- supplementary: 体质测评 ----------
+tizhi_out = []
+_tp = ROOT / "supp_data" / "json" / "中医体质.json"
+if _tp.exists():
+    for r in json.loads(_tp.read_text()):
+        tizhi_out.append({
+            "name": r["zheng"].strip(),
+            "symptom": r.get("symptom", ""), "disease": r.get("disease", ""),
+            "desc": r.get("desc", ""), "food": r.get("food", ""),
+            "medicine": r.get("medicine", ""), "sport": r.get("sport", ""),
+            "xuewei": r.get("xuewei", ""), "badfood": r.get("badfood", ""),
+            "quiz": [q.strip() for q in r.get("quiz", "").split("-") if q.strip()],
+        })
+
 # ---------- graph ----------
 # per-disease top herbs (for tooltip) — count occurrences across its formulas
 disease_herb_freq = defaultdict(Counter)
@@ -767,6 +781,7 @@ meta = {
 (SD / "zhengxing.json").write_text(json.dumps(zheng_out, ensure_ascii=False))
 (SD / "glossary.json").write_text(json.dumps(glossary_out, ensure_ascii=False))
 (SD / "patent.json").write_text(json.dumps(patent_out, ensure_ascii=False))
+(SD / "tizhi.json").write_text(json.dumps(tizhi_out, ensure_ascii=False))
 (SD / "graph.json").write_text(json.dumps(graph, ensure_ascii=False))
 (SD / "search.json").write_text(json.dumps(search, ensure_ascii=False))
 (SD / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))
