@@ -637,7 +637,7 @@ def parse_chufang():
         if idx < body_start:
             continue
 
-        for line in pg["lines"]:
+        for li, line in enumerate(pg["lines"]):
             s = re.sub(r"\s+", "", line)
             hit = heading_hit(s)
             if hit:
@@ -648,6 +648,10 @@ def parse_chufang():
                 continue
             num = re.match(r"^(\d{1,2})[.、．]\s*(.+)", s)
             doseish = re.search(r"[錢两克分斤枚粒条片]|水煎|煎服|捣|敷|炖|冲服|外用|服", s)
+            # an open formula whose text doesn't end with terminal punctuation
+            # is mid-sentence — the next line continues it (page-break tails)
+            cont = (cur_fx is not None
+                    and not cur_fx["text"].rstrip().endswith(("。", "！", "？", "；", "：", ":")))
             if num:
                 n = int(num.group(1))
                 if n <= last_idx_seen or cur_fx is None:
@@ -660,8 +664,10 @@ def parse_chufang():
                     cur["groups"].append({"desc": "".join(desc_buf), "items": [cur_fx]})
                     desc_buf = []
                 last_idx_seen = n
-            elif cur_fx is not None and doseish:
+            elif cur_fx is not None and (doseish or cont):
                 cur_fx["text"] += line.strip()
+            elif s in ("治疗", "治療", "预防", "預防"):
+                continue  # section marker, not content
             else:
                 cur_fx = None
                 last_idx_seen = 0
