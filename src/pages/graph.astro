@@ -6,26 +6,19 @@ import Base from '../layouts/Base.astro';
     <div id="graph"></div>
     <div class="graph-tools">
       <div class="panel">
-        <input id="gq" type="search" placeholder="定位节点…" />
-        <div style="margin-top:10px;display:flex;flex-direction:column;gap:5px">
-          <label><input type="checkbox" id="showH" checked /> 草药节点</label>
-          <label><input type="checkbox" id="showD" checked /> 病症节点</label>
-          <label><input type="checkbox" id="relTreat" checked /> 「组方治疗」边</label>
-          <label><input type="checkbox" id="relIndic" checked /> 「主治」边</label>
-        </div>
+        <input id="gq" type="search" placeholder="搜草药或病症…" />
       </div>
-      <div class="panel" style="display:flex;gap:6px">
-        <button class="chip" id="layNet" style="cursor:pointer;border-color:var(--cinnabar);color:var(--cinnabar)">网状</button>
-        <button class="chip" id="layBi" style="cursor:pointer">二分</button>
+      <div class="panel" id="crumbs">
+        <a class="chip crumb" data-lv="0" style="cursor:pointer">总览</a>
       </div>
-      <div class="panel" id="focusBar" style="display:none;align-items:center;gap:8px">
-        <span id="focusName" style="font-size:13px;color:var(--ink-1)"></span>
-        <button class="chip" id="focusExit" style="cursor:pointer">退出聚焦</button>
+      <div class="panel" id="optBar" style="display:none;flex-direction:column;gap:5px">
+        <label><input type="checkbox" id="relTreat" checked /> 「组方治疗」边</label>
+        <label><input type="checkbox" id="relIndic" checked /> 「主治」边</label>
       </div>
       <div class="panel graph-legend">
         <span><i class="dot" style="background:#3f5d46"></i>草药（按功效分色）</span>
         <span><i class="dot" style="background:#b23a24"></i>病症（按科别分色）</span>
-        <span style="font-size:11px;color:var(--ink-3)">单击聚焦邻域 · 双击进入详情</span>
+        <span style="font-size:11px;color:var(--ink-3)">单击下钻/聚焦 · 双击进详情页</span>
       </div>
     </div>
   </div>
@@ -38,21 +31,47 @@ import Base from '../layouts/Base.astro';
     chart.showLoading({ text: '图谱加载中…', color: '#b23a24', textColor: '#57503f', maskColor: 'rgba(246,241,229,.7)' });
 
     let DATA = null;
-    let ADJ = new Map();            // id -> Set(neighbor ids)
-    let layout = 'net';
-    let tier = 0;                   // 0 far | 1 mid | 2 close
-    let focusId = null;
+    let ADJ = new Map();
+    // view state: {mode:'overview'} | {mode:'drill',cat,side} | {mode:'ego',id}
+    let view = { mode: 'overview' };
+    let tier = 1;
 
-    // muted chinese palette
     const HERB_PAL = ['#3f5d46','#527a4f','#6b7a3f','#3f7a6b','#5a6b8a','#8a6b3f','#4f6b7a','#7a5a8a'];
     const DIS_PAL  = ['#b23a24','#c05a2e','#a34a3a','#c07a2e','#8a3a4a','#b26a24','#9a4a2e','#7a3a3a'];
     const hash = s => { let h = 0; for (const c of s || '') h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
     const colorOf = n => (n.type === 'herb' ? HERB_PAL : DIS_PAL)[hash(n.cat) % 8];
-
     const esc = s => (s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+    /* ---------- aggregates (computed once) ---------- */
+    let AG = null;
+    function buildAgg() {
+      const hc = new Map(), dc = new Map();  // cat -> {members:Set, links:0}
+      for (const n of DATA.nodes) {
+        const m = n.type === 'herb' ? hc : dc;
+        const c = n.cat || '其他';
+        if (!m.has(c)) m.set(c, { members: new Set(), links: 0 });
+        m.get(c).members.add(n.id);
+      }
+      const agg = new Map(); // 'hcat|||dcat' -> count
+      for (const l of DATA.links) {
+        const s = DATA.nodeById[l.source], t = DATA.nodeById[l.target];
+        const hc0 = s.type === 'herb' ? s.cat || '其他' : t.cat || '其他';
+        const dc0 = s.type === 'herb' ? t.cat || '其他' : s.cat || '其他';
+        const k = hc0 + '|||' + dc0;
+        agg.set(k, (agg.get(k) || 0) + 1);
+        hc.get(hc0).links++; dc.get(dc0).links++;
+      }
+      AG = { hc, dc, agg };
+    }
+
+    /* ---------- tooltips ---------- */
     function tip(p) {
       const d = p.data;
+      if (d.agg) {
+        return `<div style="max-width:210px"><b style="font-size:15px">${esc(d.name)}</b>
+          <div style="color:#57503f;font-size:12.5px;margin-top:3px">${d.count} 个条目 · ${d.edges} 条关联</div>
+          <div style="color:#8a7f66;font-size:11px;margin-top:4px">单击展开此类别</div></div>`;
+      }
       const url = `${BASE}${d.type === 'herb' ? '/herbs/' : '/diseases/'}${d.slug}`;
       if (d.type === 'herb') {
         const img = d.img ? `<img src="${BASE}/img/${d.img}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:6px">` : '';
@@ -62,66 +81,132 @@ import Base from '../layouts/Base.astro';
           ${d.xw ? `<div style="color:#57503f;font-size:12.5px;margin-top:2px"><b style="color:#a5823c">性味</b> ${esc(d.xw)}</div>` : ''}
           ${d.fn ? `<div style="color:#57503f;font-size:12.5px;margin-top:2px"><b style="color:#a5823c">主治</b> ${esc(d.fn)}…</div>` : ''}
           <div style="margin-top:6px"><a href="${url}" style="color:#b23a24;font-size:12px">查看详情 →</a>
-          <span style="color:#8a7f66;font-size:11px;margin-left:8px">${d.deg} 条关联</span></div></div>`;
+          <span style="color:#8a7f66;font-size:11px;margin-left:8px">${d.deg} 条关联 · 单击聚焦邻域</span></div></div>`;
       }
       return `<div style="max-width:220px"><b style="font-size:15px">${esc(d.name)}</b>
         <span style="color:#8a7f66;font-size:12px"> · ${esc(d.cat || '病症')}</span><br/>
         <div style="color:#57503f;font-size:12.5px;margin-top:2px">验方 ${d.fc ?? 0} 首 · ${d.deg} 条关联</div>
         ${d.top?.length ? `<div style="color:#57503f;font-size:12px;margin-top:3px">常用药：${esc(d.top.join('、'))}</div>` : ''}
-        <div style="margin-top:6px"><a href="${url}" style="color:#b23a24;font-size:12px">查看详情 →</a></div></div>`;
+        <div style="margin-top:6px"><a href="${url}" style="color:#b23a24;font-size:12px">查看详情 →</a>
+        <span style="color:#8a7f66;font-size:11px;margin-left:8px">单击聚焦邻域</span></div></div>`;
     }
 
-    const degLabel = d => tier === 2 ? d.deg > 2 : tier === 1 ? d.deg > 10 : d.deg > 28;
-    const usePic = n => tier === 2 && n.type === 'herb' && n.img;
+    /* ---------- views ---------- */
+    const SERIF = 'Songti SC, STSong, SimSun, serif';
 
-    function buildNodes() {
-      const showH = document.getElementById('showH').checked;
-      const showD = document.getElementById('showD').checked;
-      const fs = focusId ? new Set([focusId, ...ADJ.get(focusId) || []]) : null;
-      return DATA.nodes.filter(n => (n.type === 'herb' ? showH : showD)).map(n => {
-        const dim = fs && !fs.has(n.id);
-        return {
+    function overviewSpec() {
+      const hcs = [...AG.hc.entries()].sort((a, b) => b[1].links - a[1].links);
+      const dcs = [...AG.dc.entries()].sort((a, b) => b[1].links - a[1].links);
+      const mkNodes = (list, x, type) => list.map(([cat, v], i) => ({
+        id: 'C' + type + cat, name: cat, agg: true, side: type, cat,
+        count: v.members.size, edges: v.links,
+        x, y: (i - (list.length - 1) / 2) * Math.min(90, 900 / list.length),
+        symbolSize: Math.min(46, 14 + Math.sqrt(v.links) * 0.9),
+        itemStyle: {
+          color: (type === 'h' ? HERB_PAL : DIS_PAL)[hash(cat) % 8],
+          borderColor: '#f6f1e5', borderWidth: 2,
+          shadowBlur: 8, shadowColor: 'rgba(80,60,30,.25)', shadowOffsetY: 2,
+        },
+        label: { show: true, position: x < 0 ? 'left' : 'right', fontSize: 13,
+                 color: '#2c2820', fontFamily: SERIF, fontWeight: 'bold',
+                 textBorderColor: '#f6f1e5', textBorderWidth: 3 },
+      }));
+      const nodes = [...mkNodes(hcs, -420, 'h'), ...mkNodes(dcs, 420, 'd')];
+      const links = [...AG.agg.entries()].map(([k, c]) => {
+        const [h, d] = k.split('|||');
+        return { source: 'Ch' + h, target: 'Cd' + d,
+                 lineStyle: { width: Math.min(7, 0.5 + Math.sqrt(c) * 0.55), opacity: 0.35,
+                              color: 'source', curveness: 0.18 } };
+      });
+      return { nodes, links };
+    }
+
+    function memberVisible() {
+      // returns Set of node ids to render for drill/ego
+      if (view.mode === 'drill') {
+        const { cat, side } = view;
+        const s = new Set();
+        if (side === 'h') {
+          for (const id of AG.hc.get(cat).members) {
+            s.add(id);
+            for (const nb of ADJ.get(id) || []) s.add(nb);
+          }
+        } else {
+          for (const id of AG.dc.get(cat).members) {
+            s.add(id);
+            for (const nb of ADJ.get(id) || []) s.add(nb);
+          }
+        }
+        return s;
+      }
+      // ego
+      const s = new Set([view.id]);
+      for (const nb of ADJ.get(view.id) || []) s.add(nb);
+      return s;
+    }
+
+    const degLabel = d => view.mode === 'ego' ? true : tier === 2 ? d.deg > 2 : d.deg > 8;
+    const usePic = n => view.mode === 'ego' ? (n.type === 'herb' && n.img)
+                                          : (tier === 2 && n.type === 'herb' && n.img && n.deg > 2);
+
+    function memberSpec() {
+      const vis = memberVisible();
+      const rT = document.getElementById('relTreat').checked;
+      const rI = document.getElementById('relIndic').checked;
+      const cx = view.mode === 'ego' ? 0 : 0;
+      // ego: radial layout — center + neighbor ring sorted by degree
+      const pos = new Map();
+      if (view.mode === 'ego') {
+        pos.set(view.id, [0, 0]);
+        const nbs = [...ADJ.get(view.id) || []].filter(id => vis.has(id))
+          .map(id => DATA.nodeById[id]).sort((a, b) => b.deg - a.deg);
+        const n = nbs.length;
+        nbs.forEach((nb, i) => {
+          const a = 2 * Math.PI * i / n - Math.PI / 2;
+          const r = n > 60 ? 300 + 120 * Math.floor(i / 60) : 300;
+          pos.set(nb.id, [r * Math.cos(a), r * Math.sin(a)]);
+        });
+      }
+      const nodes = [];
+      for (const id of vis) {
+        const n = DATA.nodeById[id];
+        if (!n) continue;
+        const [px, py] = view.mode === 'ego' ? pos.get(id) : [n.x, n.y];
+        const center = view.mode === 'ego' && id === view.id;
+        nodes.push({
           id: n.id, name: n.name, slug: n.slug, type: n.type,
           img: n.img, xw: n.xw, fn: n.fn, fc: n.fc, top: n.top, cat: n.cat, deg: n.deg,
-          x: layout === 'net' ? n.x : n.bx,
-          y: layout === 'net' ? n.y : n.by,
-          fixed: true,
+          x: px, y: py, fixed: true,
           symbol: usePic(n) ? 'image://' + BASE + '/img/' + n.img : 'circle',
-          symbolSize: usePic(n) ? Math.min(46, 20 + Math.sqrt(n.deg) * 5)
-                                : Math.min(26, 7 + Math.sqrt(n.deg) * 2.4),
+          symbolSize: center ? 34 : usePic(n) ? Math.min(42, 18 + Math.sqrt(n.deg) * 5)
+                                            : Math.min(24, 6 + Math.sqrt(n.deg) * 2.2),
           symbolKeepAspect: true,
           itemStyle: {
             color: colorOf(n),
-            borderColor: n.id === focusId ? '#b23a24' : '#f6f1e5',
-            borderWidth: n.id === focusId ? 3 : 1.6,
-            shadowBlur: dim ? 0 : 7, shadowColor: 'rgba(80,60,30,.28)', shadowOffsetY: 1.5,
-            opacity: dim ? 0.07 : 1,
+            borderColor: center ? '#b23a24' : '#f6f1e5',
+            borderWidth: center ? 3 : 1.5,
+            shadowBlur: 6, shadowColor: 'rgba(80,60,30,.25)', shadowOffsetY: 1.5,
           },
           label: {
-            show: !dim && degLabel(n),
-            position: 'bottom', fontSize: 11.5, color: '#2c2820',
-            fontFamily: 'Songti SC, STSong, SimSun, serif',
+            show: degLabel(n) || center,
+            position: 'bottom', fontSize: center ? 14 : 11,
+            fontWeight: center ? 'bold' : 'normal',
+            color: '#2c2820', fontFamily: SERIF,
             textBorderColor: '#f6f1e5', textBorderWidth: 3,
           },
-        };
-      });
+        });
+      }
+      const links = DATA.links
+        .filter(l => vis.has(l.source) && vis.has(l.target) && (l.rel === '组方治疗' ? rT : rI))
+        .map(l => ({ ...l, lineStyle: { opacity: 0.3, width: 0.9, color: 'source' } }));
+      return { nodes, links };
     }
 
     let lastNodes = [];
     function rebuild() {
-      const rT = document.getElementById('relTreat').checked;
-      const rI = document.getElementById('relIndic').checked;
-      const nodes = buildNodes();
-      lastNodes = nodes;
-      const ids = new Set(nodes.map(n => n.id));
-      const links = DATA.links
-        .filter(l => ids.has(l.source) && ids.has(l.target) && (l.rel === '组方治疗' ? rT : rI))
-        .map(l => {
-          const hot = focusId && (l.source === focusId || l.target === focusId);
-          const dim = focusId && !hot;
-          return { ...l, lineStyle: { opacity: dim ? 0.03 : hot ? 0.85 : 0.28,
-                                      width: hot ? 1.6 : 0.9, color: 'source' } };
-        });
+      const spec = view.mode === 'overview' ? overviewSpec() : memberSpec();
+      lastNodes = spec.nodes;
+      document.getElementById('optBar').style.display = view.mode === 'overview' ? 'none' : 'flex';
       chart.setOption({
         animation: false,
         tooltip: {
@@ -131,90 +216,86 @@ import Base from '../layouts/Base.astro';
         },
         series: [{
           type: 'graph', layout: 'none', roam: true, draggable: true,
-          nodes, links,
+          nodes: spec.nodes, links: spec.links,
           emphasis: { focus: 'adjacency',
-                      lineStyle: { width: 2, opacity: .9 },
+                      lineStyle: { width: 2.2, opacity: .95 },
                       label: { show: true, fontSize: 13, fontWeight: 'bold' } },
-          scaleLimit: { min: 0.08, max: 12 },
+          scaleLimit: { min: 0.1, max: 12 },
           progressive: 500,
         }],
       }, { replaceMerge: ['series'] });
+      renderCrumbs();
     }
 
-    function setFocus(id) {
-      focusId = id;
-      const bar = document.getElementById('focusBar');
-      if (id) {
-        bar.style.display = 'flex';
-        document.getElementById('focusName').textContent =
-          '聚焦：' + (DATA.nodes.find(n => n.id === id)?.name || '');
-      } else {
-        bar.style.display = 'none';
-      }
-      rebuild();
+    function renderCrumbs() {
+      const c = document.getElementById('crumbs');
+      const parts = ['<a class="chip crumb" data-lv="0" style="cursor:pointer">总览</a>'];
+      if (view.mode === 'drill')
+        parts.push(`<span class="chip" style="border-color:var(--cinnabar);color:var(--cinnabar)">${esc(view.cat)}</span>`);
+      if (view.mode === 'ego')
+        parts.push(`<span class="chip" style="border-color:var(--cinnabar);color:var(--cinnabar)">${esc(DATA.nodeById[view.id].name)}</span>`);
+      c.innerHTML = parts.join('<span style="color:var(--ink-3);margin:0 2px">›</span>');
+      c.querySelector('.crumb').onclick = () => { view = { mode: 'overview' }; rebuild(); };
     }
-    document.getElementById('focusExit').onclick = () => setFocus(null);
 
+    /* ---------- events ---------- */
     fetch(BASE + '/data/graph.json').then(r => r.json()).then(g => {
       DATA = g;
+      DATA.nodeById = {};
+      for (const n of g.nodes) DATA.nodeById[n.id] = n;
       for (const l of g.links) {
         (ADJ.get(l.source) || ADJ.set(l.source, new Set()).get(l.source)).add(l.target);
         (ADJ.get(l.target) || ADJ.set(l.target, new Set()).get(l.target)).add(l.source);
       }
+      buildAgg();
       chart.hideLoading();
       rebuild();
     });
 
-    ['showH', 'showD', 'relTreat', 'relIndic'].forEach(id =>
+    ['relTreat', 'relIndic'].forEach(id =>
       document.getElementById(id).addEventListener('change', rebuild));
 
-    const btnN = document.getElementById('layNet'), btnB = document.getElementById('layBi');
-    function setLayout(m) {
-      layout = m;
-      for (const [b, on] of [[btnN, m === 'net'], [btnB, m === 'bi']]) {
-        b.style.borderColor = on ? 'var(--cinnabar)' : '';
-        b.style.color = on ? 'var(--cinnabar)' : '';
-      }
-      rebuild();
-    }
-    btnN.onclick = () => setLayout('net');
-    btnB.onclick = () => setLayout('bi');
-
-    // zoom -> label density / image nodes
     let roamT = null;
     chart.on('graphRoam', () => {
+      if (view.mode !== 'drill') return;
       clearTimeout(roamT);
       roamT = setTimeout(() => {
         const z = chart.getOption().series?.[0]?.zoom ?? 1;
-        const t = z >= 2.4 ? 2 : z >= 1.1 ? 1 : 0;
+        const t = z >= 2.4 ? 2 : 1;
         if (t !== tier) { tier = t; rebuild(); }
       }, 160);
     });
 
-    // click focus / dblclick navigate
     let clickT = null;
     chart.on('click', p => {
       if (p.dataType !== 'node') return;
       clearTimeout(clickT);
-      clickT = setTimeout(() => setFocus(p.data.id === focusId ? null : p.data.id), 220);
+      clickT = setTimeout(() => {
+        const d = p.data;
+        if (view.mode === 'overview' && d.agg) {
+          view = { mode: 'drill', cat: d.cat, side: d.side };
+        } else if (!d.agg) {
+          view = { mode: 'ego', id: d.id };
+        }
+        rebuild();
+      }, 220);
     });
     chart.on('dblclick', p => {
       clearTimeout(clickT);
-      if (p.dataType === 'node' && p.data.slug)
+      if (p.dataType === 'node' && !p.data.agg && p.data.slug)
         location.href = BASE + (p.data.type === 'herb' ? '/herbs/' : '/diseases/') + p.data.slug;
     });
 
-    // search -> focus + tip
     document.getElementById('gq').addEventListener('input', e => {
       const v = e.target.value.trim();
       if (!DATA || !v) return;
       const n = DATA.nodes.find(n => n.name === v) || DATA.nodes.find(n => n.name.includes(v));
       if (!n) return;
-      setFocus(n.id);
+      view = { mode: 'ego', id: n.id };
+      rebuild();
       const di = lastNodes.findIndex(x => x.id === n.id);
       if (di >= 0) {
-        const pt = chart.convertToPixel({ seriesIndex: 0 },
-          [layout === 'net' ? n.x : n.bx, layout === 'net' ? n.y : n.by]);
+        const pt = chart.convertToPixel({ seriesIndex: 0 }, [0, 0]);
         chart.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: di, position: pt });
       }
     });
