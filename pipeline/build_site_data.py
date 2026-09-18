@@ -302,6 +302,25 @@ for h in herbs_out:
     h["formulas"] = herb_formulas.get(h["id"], [])
     h["diseases"] = sorted(herb_indic.get(h["id"], set()) | herb_diseases.get(h["id"], set()))
 
+# reverse: disease -> herbs claiming to treat it in their 功用/主治 text.
+# herbs already present in the disease's formulas are excluded so the page can
+# show "验方用药" and "载述主治" as two distinct groups.
+disease_indic_herbs = defaultdict(set)
+for hid, dnames in herb_indic.items():
+    for dn in dnames:
+        disease_indic_herbs[dn].add(hid)
+
+_fx_herbs = defaultdict(set)
+for fo in formulas_out:
+    if fo.get("disease_id"):
+        for c in fo["composition"]:
+            if c.get("herb_id"):
+                _fx_herbs[fo["disease_id"]].add(c["herb_id"])
+
+for d in diseases_out:
+    extra = sorted(disease_indic_herbs.get(d["name"], set()) - _fx_herbs.get(d["id"], set()))
+    d["indic_herbs"] = [hslug_of[hid] for hid in extra if hslug_of.get(hid)]
+
 used_d = set()
 for d in diseases_out:
     s = re.sub(r"[\\/\\?%*:|\"<>#&=+．。()（）\[\]【】,，、;；:：\s]+", "-", d["name"]).strip("-") or d["id"]

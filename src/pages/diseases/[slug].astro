@@ -18,6 +18,8 @@ const myFormulas = (d.formulas ?? [])
 const herbIds = [...new Set(myFormulas.flatMap((f: any) => f.composition.map((c: any) => c.slug).filter(Boolean)))];
 const hslug = Object.fromEntries(herbs.map((h: any) => [h.slug, h]));
 const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
+// herbs that claim to treat this disease in their 功用/主治 text (not in formulas)
+const indicHerbs = (d.indic_herbs ?? []).map((s: any) => hslug[s]).filter(Boolean);
 ---
 <Base title={d.name} desc={`${d.category} · 验方 ${myFormulas.length} 首`}>
   <div class="wrap">
@@ -37,14 +39,33 @@ const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
       </section>
     )}
 
-    {relHerbs.length > 0 && (
+    {(relHerbs.length > 0 || indicHerbs.length > 0) && (
       <section class="sec">
-        <div class="sec-h">常用草药</div>
-        <div class="sec-bd rel-list">
-          {relHerbs.slice(0, 40).map((h: any) => <a class="pill" href={u('/herbs/' + h.slug)}>{h.name}</a>)}
+        <div class="sec-h">相关草药</div>
+        <div class="sec-bd">
+          {relHerbs.length > 0 && (
+            <div class="herb-grp">
+              <div class="grp-tag">验方用药</div>
+              <div class="rel-list">
+                {relHerbs.slice(0, 40).map((h: any) => <a class="pill" href={u('/herbs/' + h.slug)}>{h.name}</a>)}
+              </div>
+            </div>
+          )}
+          {indicHerbs.length > 0 && (
+            <div class="herb-grp" style="margin-top:14px">
+              <div class="grp-tag">载述主治 <span style="font-weight:400;font-size:12px;color:var(--ink-3)">各书功用中载治此症</span></div>
+              <div class="rel-list">
+                {indicHerbs.slice(0, 40).map((h: any) => <a class="pill indic" href={u('/herbs/' + h.slug)}>{h.name}</a>)}
+              </div>
+            </div>
+          )}
         </div>
       </section>
     )}
+    <style>
+      .grp-tag { font-size: 13.5px; color: var(--ink-2); font-weight: 600; margin-bottom: 8px; }
+      .pill.indic { border-style: dashed; }
+    </style>
 
     <section class="sec">
       <div class="sec-h">验方</div>
