@@ -15,6 +15,7 @@ const BOOK_LABEL: Record<string, string> = {
 const idx = herbs.map((h: any) => ({
   s: h.slug, n: h.name, a: h.aliases.join(' '), c: h.category, b: h.books.join(','),
   i: h.images?.[0]?.file ?? '',
+  x: (h.xw?.qi ?? []).join(','), w: (h.xw?.wei ?? []).join(''), d: !!h.xw?.du,
   e: (Object.values(h.sections?.find((x: any) => ['功能主治','功用','性味功能'].includes(x.label))?.texts ?? {})[0] as string ?? '').slice(0, 60),
 }));
 ---
@@ -27,6 +28,9 @@ const idx = herbs.map((h: any) => ({
       <input id="q" type="search" placeholder="搜药名 / 别名…" />
       <select id="cat"><option value="">全部类别</option>{cats.map(c => <option value={c}>{c}</option>)}</select>
       <select id="bk"><option value="">全部出处</option>{books.map(b => <option value={b}>{BOOK_LABEL[b] ?? b}</option>)}</select>
+      <select id="qi"><option value="">四气</option>{['寒','热','温','凉','平'].map(x => <option value={x}>{x}</option>)}</select>
+      <select id="wei"><option value="">五味</option>{['辛','甘','酸','苦','咸','淡','涩'].map(x => <option value={x}>{x}</option>)}</select>
+      <label class="chip"><input type="checkbox" id="du" /> 有毒</label>
       <label class="chip"><input type="checkbox" id="hasimg" /> 有图</label>
       <span class="count" id="count"></span>
     </div>
@@ -42,7 +46,9 @@ const idx = herbs.map((h: any) => ({
     const grid = document.getElementById('grid'), empty = document.getElementById('empty'),
           count = document.getElementById('count'), more = document.getElementById('more');
     const q = document.getElementById('q'), cat = document.getElementById('cat'),
-          bk = document.getElementById('bk'), hasimg = document.getElementById('hasimg');
+          bk = document.getElementById('bk'), hasimg = document.getElementById('hasimg'),
+          qi = document.getElementById('qi'), wei = document.getElementById('wei'),
+          du = document.getElementById('du');
     const PAGE = 60;
     let filtered = data, shown = 0;
 
@@ -64,13 +70,15 @@ const idx = herbs.map((h: any) => ({
       count.textContent = `${filtered.length} 味`;
     }
     function apply() {
-      const v = q.value.trim(), c = cat.value, b = bk.value, hi = hasimg.checked;
+      const v = q.value.trim(), c = cat.value, b = bk.value, hi = hasimg.checked,
+            qv = qi.value, wv = wei.value, dv = du.checked;
       filtered = data.filter(h =>
         (!v || h.n.includes(v) || h.a.includes(v)) &&
-        (!c || h.c === c) && (!b || h.b.split(',').includes(b)) && (!hi || h.i));
+        (!c || h.c === c) && (!b || h.b.split(',').includes(b)) && (!hi || h.i) &&
+        (!qv || h.x.split(',').includes(qv)) && (!wv || h.w.includes(wv)) && (!dv || h.d));
       shown = 0; grid.innerHTML = ''; render();
     }
-    [q, cat, bk, hasimg].forEach(el => el.addEventListener('input', apply));
+    [q, cat, bk, hasimg, qi, wei, du].forEach(el => el.addEventListener('input', apply));
     more.addEventListener('click', render);
     apply();
   </script>

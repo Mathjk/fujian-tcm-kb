@@ -353,11 +353,13 @@ for fo in formulas_out:
 
 # herb -> disease via 主治 text matching (disease name appears in herb's indication text)
 herb_indic = defaultdict(set)
+herb_indic_text = {}
 dname_by_len = sorted((d["name"] for d in diseases_out if len(d["name"]) >= 2), key=len, reverse=True)
 for h in herbs_out:
     txt = " ".join(t for s in h["sections"] if s["label"] in ("功用", "功能主治", "性味功能", "应用", "主治") for t in s["texts"].values())
     if not txt:
         continue
+    herb_indic_text[h["id"]] = txt
     for dn in dname_by_len:
         if dn in txt:
             herb_indic[h["id"]].add(dn)
@@ -365,6 +367,54 @@ for h in herbs_out:
 for h in herbs_out:
     h["formulas"] = herb_formulas.get(h["id"], [])
     h["diseases"] = sorted(herb_indic.get(h["id"], set()) | herb_diseases.get(h["id"], set()))
+
+# ---------- herb pairs (co-occurrence in formulas) & similar herbs ----------
+pair_cnt = defaultdict(Counter)
+for fo in formulas_out:
+    hids = sorted({c["herb_id"] for c in fo["composition"] if c["herb_id"]})
+    for i in range(len(hids)):
+        for j in range(i + 1, len(hids)):
+            pair_cnt[hids[i]][hids[j]] += 1
+            pair_cnt[hids[j]][hids[i]] += 1
+
+name_of = {h["id"]: h["name"] for h in herbs_out}
+dset_of = {h["id"]: set(h["diseases"]) for h in herbs_out}
+for h in herbs_out:
+    top = pair_cnt.get(h["id"], Counter()).most_common(8)
+    h["pairs"] = [{"n": name_of[pid], "s": hslug_of[pid], "c": cnt}
+                  for pid, cnt in top if pid in name_of and cnt >= 2]
+    s = dset_of[h["id"]]
+    scored = []
+    if len(s) >= 2:
+        for g in herbs_out:
+            if g["id"] == h["id"]:
+                continue
+            t = dset_of[g["id"]]
+            inter = len(s & t)
+            if inter >= 2:
+                scored.append((inter / len(s | t), inter, g))
+        scored.sort(key=lambda x: (-x[0], -x[1]))
+    h["similar"] = [{"n": g["name"], "s": g["slug"], "c": inter} for _, inter, g in scored[:6]]
+
+# ---------- 性味 (四气/五味/毒) ----------
+QI_ORDER = ["大寒", "大热", "微寒", "微温", "寒", "热", "温", "凉", "平"]
+QI_BUCKET = {"大寒": "寒", "寒": "寒", "微寒": "寒", "凉": "凉", "平": "平",
+             "微温": "温", "温": "温", "热": "热", "大热": "热"}
+WEI_ORDER = ["辛", "甘", "酸", "苦", "咸", "淡", "涩"]
+for h in herbs_out:
+    # only the flavor clause (before the first 。); 性味功能 continues with 功效 text
+    # where words like 肺热/退热 would falsely match 四气
+    xw_txt = " ".join((t.split("。")[0] or t) for s in h["sections"]
+                      if s["label"] in ("性味", "性味功能") for t in s["texts"].values())
+    qi, rest = [], xw_txt
+    for q in QI_ORDER:
+        if q in rest:
+            b = QI_BUCKET[q]
+            if b not in qi:
+                qi.append(b)
+            rest = rest.replace(q, "")
+    h["xw"] = {"qi": qi, "wei": [w for w in WEI_ORDER if w in xw_txt],
+               "du": ("有毒" in xw_txt or "大毒" in xw_txt or "小毒" in xw_txt)}
 
 # reverse: disease -> herbs claiming to treat it in their 功用/主治 text.
 # herbs already present in the disease's formulas are excluded so the page can
@@ -532,12 +582,15 @@ graph = {"nodes": nodes, "links": links}
 search = []
 for h in herbs_out:
     kw = " ".join(h["aliases"] + [h["latin"], h["family"], h["category"],
-                                h.get("py", ""), h.get("pinyin", ""), h.get("en", "")])
+                                h.get("py", ""), h.get("pinyin", ""), h.get("en", ""),
+                                herb_indic_text.get(h["id"], "")[:800]])
     search.append({"t": "h", "n": h["name"], "s": h["slug"], "k": kw})
 for d in diseases_out:
     dpy = pinyin_plain(d["name"])
+    fx_names = " ".join(name_of[x] for x in _fx_herbs.get(d["id"], set()) if x in name_of)
+    ddesc = " ".join(d.get("desc", []))[:400]
     search.append({"t": "d", "n": d["name"], "s": d["slug"],
-                   "k": d["category"] + " " + dpy})
+                   "k": " ".join([d["category"], dpy, fx_names, ddesc])})
 
 meta = {
     "title": "闽本草",

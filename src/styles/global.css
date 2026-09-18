@@ -206,6 +206,28 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hi); border
 .d-aliases { margin-top: 14px; font-size: 14px; color: var(--ink-2); }
 .d-aliases b { color: var(--gold); font-family: var(--kai); font-weight: 400; letter-spacing: .1em; margin-right: 6px; }
 
+.pill-c { font-size: 11px; color: var(--ink-3); margin-left: 6px; font-weight: 400; }
+.feedback { margin-top: 34px; font-size: 12.5px; color: var(--ink-3); }
+.feedback a { color: var(--gold); margin-left: 4px; }
+
+.daily-herb { margin: 34px 0 0; padding: 0; overflow: hidden; position: relative; }
+.daily-herb .dh-tag {
+  position: absolute; margin: 0; padding: 5px 14px;
+  background: var(--cinnabar); color: #fff; font-family: var(--kai);
+  font-size: 13px; letter-spacing: .2em; border-radius: 0 0 8px 0;
+}
+.daily-herb .dh-body { display: flex; align-items: stretch; text-decoration: none; color: inherit; }
+.daily-herb .dh-img { width: 150px; min-width: 150px; background: #fbf7ee; }
+.daily-herb .dh-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.daily-herb .dh-info { padding: 20px 22px; flex: 1; min-width: 0; }
+.daily-herb .dh-name { font-size: 24px; font-weight: 700; letter-spacing: .1em; }
+.daily-herb .dh-py { color: var(--gold); font-family: var(--kai); font-size: 14px; margin-top: 2px; }
+.daily-herb .dh-cat { font-size: 12.5px; color: var(--pine-2); margin-top: 6px; }
+.daily-herb .dh-ex { font-size: 13px; color: var(--ink-3); margin-top: 8px; line-height: 1.7;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.daily-herb .dh-go { align-self: center; padding: 0 22px; color: var(--gold); font-size: 14px; white-space: nowrap; }
+.sr-item .k { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .sec { margin-top: 26px; }
 .sec-h {
   display: flex; align-items: center; gap: 10px;

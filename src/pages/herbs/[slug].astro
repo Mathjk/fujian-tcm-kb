@@ -84,6 +84,30 @@ const bookCount = herb.books?.length ?? 0;
       </section>
     )}
 
+    {herb.pairs?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">配伍常用药</div>
+        <div class="sec-bd rel-list">
+          {herb.pairs.map((p: any) => (
+            <a class="pill" href={u('/herbs/' + p.s)}>{p.n}<span class="pill-c">{p.c} 方同用</span></a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {herb.similar?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">相似草药</div>
+        <div class="sec-bd rel-list">
+          {herb.similar.map((g: any) => (
+            <a class="pill" href={u('/herbs/' + g.s)}>{g.n}<span class="pill-c">{g.c} 症相同</span></a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <div class="feedback">本条内容有误？<a href={`https://github.com/Mathjk/fujian-tcm-kb/issues/new?title=${encodeURIComponent('[纠错] 草药：' + herb.name)}&body=${encodeURIComponent('条目：' + herb.name + '\n页面：/herbs/' + herb.slug + '\n\n问题描述：')}`} target="_blank" rel="noopener">点此反馈</a></div>
+
     <div style="margin:50px 0"><a href={u('/herbs')}>← 返回草药图谱</a></div>
   </div>
 

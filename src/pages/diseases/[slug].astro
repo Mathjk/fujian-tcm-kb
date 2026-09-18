@@ -82,6 +82,8 @@ const indicHerbs = (d.indic_herbs ?? []).map((s: any) => hslug[s]).filter(Boolea
       </section>
     )}
 
+    <div class="feedback">本条内容有误？<a href={`https://github.com/Mathjk/fujian-tcm-kb/issues/new?title=${encodeURIComponent('[纠错] 病症：' + d.name)}&body=${encodeURIComponent('条目：' + d.name + '\n页面：/diseases/' + d.slug + '\n\n问题描述：')}`} target="_blank" rel="noopener">点此反馈</a></div>
+
     <div style="margin:50px 0"><a href={u('/diseases')}>← 返回病症索引</a></div>
   </div>
 </Base>

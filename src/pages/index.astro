@@ -6,6 +6,11 @@ import herbs from '../data/herbs.json';
 
 const withImg = herbs.filter((h: any) => h.images?.length);
 const featured = withImg.filter((_: any, i: number) => i % Math.floor(withImg.length / 12) === 0).slice(0, 12);
+// 每日一味 pool: herbs with images
+const dailyPool = withImg.map((h: any) => ({
+  s: h.slug, n: h.name, py: h.pinyin ?? '', c: h.category ?? '', i: h.images[0].file,
+  e: (Object.values(h.sections?.find((x: any) => ['功能主治','功用','性味功能'].includes(x.label))?.texts ?? {})[0] as string ?? '').slice(0, 90),
+}));
 ---
 <Base>
   <div class="wrap">
@@ -24,6 +29,20 @@ const featured = withImg.filter((_: any, i: number) => i % Math.floor(withImg.le
           <div class="stat"><b>{meta.edges}</b><span>关联</span></div>
         </div>
       </div>
+    </section>
+
+    <section class="daily-herb card" id="daily" style="display:none">
+      <div class="dh-tag">每日一味</div>
+      <a class="dh-body" id="dh-link" href="#">
+        <div class="dh-img"><img id="dh-pic" src="" alt="" loading="lazy" /></div>
+        <div class="dh-info">
+          <div class="dh-name" id="dh-name"></div>
+          <div class="dh-py" id="dh-py"></div>
+          <div class="dh-cat" id="dh-cat"></div>
+          <div class="dh-ex" id="dh-ex"></div>
+        </div>
+        <div class="dh-go">查看 →</div>
+      </a>
     </section>
 
     <div class="entry-grid">
@@ -54,4 +73,23 @@ const featured = withImg.filter((_: any, i: number) => i % Math.floor(withImg.le
       ))}
     </div>
   </div>
+
+  <script define:vars={{ dailyPool }}>
+    (function () {
+      if (!dailyPool.length) return;
+      const BASE = document.querySelector('meta[name=base]')?.getAttribute('content') ?? '';
+      const now = new Date();
+      const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+      const h = dailyPool[dayOfYear % dailyPool.length];
+      const box = document.getElementById('daily');
+      box.querySelector('#dh-link').href = BASE + '/herbs/' + h.s;
+      const img = box.querySelector('#dh-pic');
+      img.src = BASE + '/img/' + h.i; img.alt = h.n;
+      box.querySelector('#dh-name').textContent = h.n;
+      box.querySelector('#dh-py').textContent = h.py;
+      box.querySelector('#dh-cat').textContent = h.c;
+      box.querySelector('#dh-ex').textContent = h.e;
+      box.style.display = '';
+    })();
+  </script>
 </Base>
