@@ -48,6 +48,7 @@ const bookCount = herb.books?.length ?? 0;
         <div class="d-meta">
           {herb.family && <span class="chip pine">{herb.family}</span>}
           {herb.category && <span class="chip gold">{herb.category}</span>}
+          {herb.zhushi?.class && <span class="chip">{herb.zhushi.class}</span>}
           {bookCount > 1 && <span class="chip">{bookCount} 书互见</span>}
         </div>
         {herb.aliases?.length > 0 && (
@@ -74,6 +75,16 @@ const bookCount = herb.books?.length ?? 0;
         </div>
       </section>
     ))}
+
+    {herb.zhushi && (
+      <section class="sec">
+        <div class="sec-h">备考释义 <span class="supp-tag">补充资料</span></div>
+        <div class="sec-bd supp-bd">
+          {herb.zhushi.class && <div class="zhushi-class">{herb.zhushi.class}</div>}
+          <p style="margin:0">{herb.zhushi.desc}</p>
+        </div>
+      </section>
+    )}
 
     {myFormulas.length > 0 && (
       <section class="sec">

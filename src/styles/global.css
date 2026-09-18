@@ -228,6 +228,17 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hi); border
 .daily-herb .dh-go { align-self: center; padding: 0 22px; color: var(--gold); font-size: 14px; white-space: nowrap; }
 .sr-item .k { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.supp-tag {
+  font-size: 11px; font-weight: 400; letter-spacing: .1em;
+  border: 1px dashed var(--gold); color: var(--gold);
+  padding: 2px 8px; border-radius: 10px; vertical-align: middle;
+}
+.supp-bd { border-left: 3px dashed var(--gold); padding-left: 16px; opacity: .92; }
+.zhushi-class {
+  display: inline-block; font-size: 13px; color: var(--pine-2);
+  border-bottom: 1px solid var(--line-2); padding-bottom: 2px; margin-bottom: 10px;
+}
+
 .sec { margin-top: 26px; }
 .sec-h {
   display: flex; align-items: center; gap: 10px;

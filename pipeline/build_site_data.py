@@ -416,6 +416,17 @@ for h in herbs_out:
     h["xw"] = {"qi": qi, "wei": [w for w in WEI_ORDER if w in xw_txt],
                "du": ("有毒" in xw_txt or "大毒" in xw_txt or "小毒" in xw_txt)}
 
+# ---------- supplementary materia medica annotations ----------
+supp_path = ROOT / "supp_data" / "json" / "中药注释.json"
+supp_hits = 0
+if supp_path.exists():
+    supp = {norm(r["zheng"]): r for r in json.loads(supp_path.read_text())}
+    for h in herbs_out:
+        rec = next((supp[norm(k)] for k in [h["name"], *h["aliases"]] if norm(k) in supp), None)
+        if rec:
+            h["zhushi"] = {"class": rec.get("class", ""), "desc": rec.get("desc", "")}
+            supp_hits += 1
+
 # reverse: disease -> herbs claiming to treat it in their 功用/主治 text.
 # herbs already present in the disease's formulas are excluded so the page can
 # show "验方用药" and "载述主治" as two distinct groups.
@@ -597,7 +608,7 @@ meta = {
     "herbs": len(herbs_out), "diseases": len(diseases_out),
     "formulas": len(formulas_out), "edges": len(links),
     "images": sum(len(h["images"]) for h in herbs_out),
-    "english": en_hits,
+    "english": en_hits, "zhushi": supp_hits,
     "skipped_junk": skipped,
 }
 
