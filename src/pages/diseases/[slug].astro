@@ -5,6 +5,7 @@ import { u } from '../../utils/url';
 import diseases from '../../data/diseases.json';
 import formulas from '../../data/formulas.json';
 import herbs from '../../data/herbs.json';
+import zhengxing from '../../data/zhengxing.json';
 
 export function getStaticPaths() {
   return diseases.map((d: any) => ({ params: { slug: d.slug }, props: { d } }));
@@ -20,6 +21,7 @@ const hslug = Object.fromEntries(herbs.map((h: any) => [h.slug, h]));
 const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
 // herbs that claim to treat this disease in their 功用/主治 text (not in formulas)
 const indicHerbs = (d.indic_herbs ?? []).map((s: any) => hslug[s]).filter(Boolean);
+const zname = Object.fromEntries(zhengxing.map((z: any) => [z.slug, z.name]));
 ---
 <Base title={d.name} desc={`${d.category} · 验方 ${myFormulas.length} 首`}>
   <div class="wrap">
@@ -79,6 +81,15 @@ const indicHerbs = (d.indic_herbs ?? []).map((s: any) => hslug[s]).filter(Boolea
       <section class="sec">
         <div class="sec-h">选配药 · 补充</div>
         <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{d.trailing}</div>
+      </section>
+    )}
+
+    {d.zheng?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">相关证候 <span class="supp-tag">补充资料</span></div>
+        <div class="sec-bd rel-list">
+          {d.zheng.map((s: string) => <a class="pill indic" href={u('/bianzheng/' + s)}>{zname[s] ?? s}</a>)}
+        </div>
       </section>
     )}
 

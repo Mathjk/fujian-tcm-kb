@@ -455,6 +455,60 @@ for d in diseases_out:
     used_d.add(s)
     d["slug"] = s
 
+# ---------- supplementary: 证候 (patterns) & 症状词典 ----------
+dname_list = [d["name"] for d in diseases_out]
+zheng_out, glossary_out = [], []
+_zp = ROOT / "supp_data" / "json" / "疾病注释.json"
+_rp = ROOT / "supp_data" / "json" / "辨证入门症状.json"
+_gp = ROOT / "supp_data" / "json" / "症状注释.json"
+if _zp.exists():
+    _ru = {r["zheng"]: r for r in json.loads(_rp.read_text())} if _rp.exists() else {}
+    JINGFANG = re.compile(r"(汤|丸|散|膏|饮|丹|方)（?.*）?$")
+    LIUJING = ("太阳", "阳明", "少阳", "太阴", "少阴", "厥阴")
+    seen_z = set()
+    for r in json.loads(_zp.read_text()):
+        z = r["zheng"].strip()
+        if z in seen_z:
+            continue
+        seen_z.add(z)
+        if z.startswith("辨证"):
+            group, name = "辨证纲领", z[2:]
+        elif z.startswith("内科"):
+            group, name = "内科证候", z[2:]
+        elif z[:2] in LIUJING or JINGFANG.search(z):
+            group, name = "伤寒六经", z
+        else:
+            group, name = "专科杂证", z
+        rur = _ru.get(z, {})
+        syms = [s for s in re.split(r"[-*]", r.get("symptom") or rur.get("symptom") or "") if s]
+        text = name + (r.get("desc") or "") + (r.get("process") or "") + (rur.get("linchuang") or "")
+        zheng_out.append({
+            "name": name, "full": z, "group": group,
+            "desc": r.get("desc", ""), "process": r.get("process", ""),
+            "linchuang": rur.get("linchuang", ""),
+            "symptoms": syms,
+            "rel_diseases": sorted(dn for dn in dname_list if dn in text),
+        })
+    used_z = set()
+    for z in zheng_out:
+        s = re.sub(r"[\\/\\?%*:|\"<>#&=+．。()（）\[\]【】,，、;；:：\s]+", "-", z["name"]).strip("-") or "z"
+        base_s, i = s, 2
+        while s in used_z:
+            s = f"{base_s}-{i}"; i += 1
+        used_z.add(s)
+        z["slug"] = s
+    # reverse: disease -> related zheng slugs
+    for d in diseases_out:
+        d["zheng"] = [z["slug"] for z in zheng_out if d["name"] in z["rel_diseases"]][:12]
+
+if _gp.exists():
+    for r in json.loads(_gp.read_text()):
+        glossary_out.append({
+            "name": r["zheng"].strip(), "desc": r.get("desc", ""),
+            "dialogue": r.get("dialogue", ""), "category": r.get("category", ""),
+            "division": r.get("division", ""),
+        })
+
 # ---------- graph ----------
 # per-disease top herbs (for tooltip) — count occurrences across its formulas
 disease_herb_freq = defaultdict(Counter)
@@ -602,6 +656,12 @@ for d in diseases_out:
     ddesc = " ".join(d.get("desc", []))[:400]
     search.append({"t": "d", "n": d["name"], "s": d["slug"],
                    "k": " ".join([d["category"], dpy, fx_names, ddesc])})
+for z in zheng_out:
+    search.append({"t": "z", "n": z["name"], "s": z["slug"],
+                   "k": " ".join([z["group"], z.get("desc", "")[:300]])})
+for g in glossary_out:
+    search.append({"t": "g", "n": g["name"], "s": g["name"],
+                   "k": " ".join([g.get("category", ""), g.get("desc", "")[:200]])})
 
 meta = {
     "title": "闽本草",
@@ -609,12 +669,15 @@ meta = {
     "formulas": len(formulas_out), "edges": len(links),
     "images": sum(len(h["images"]) for h in herbs_out),
     "english": en_hits, "zhushi": supp_hits,
+    "zheng": len(zheng_out), "glossary": len(glossary_out),
     "skipped_junk": skipped,
 }
 
 (SD / "herbs.json").write_text(json.dumps(herbs_out, ensure_ascii=False))
 (SD / "diseases.json").write_text(json.dumps(diseases_out, ensure_ascii=False))
 (SD / "formulas.json").write_text(json.dumps(formulas_out, ensure_ascii=False))
+(SD / "zhengxing.json").write_text(json.dumps(zheng_out, ensure_ascii=False))
+(SD / "glossary.json").write_text(json.dumps(glossary_out, ensure_ascii=False))
 (SD / "graph.json").write_text(json.dumps(graph, ensure_ascii=False))
 (SD / "search.json").write_text(json.dumps(search, ensure_ascii=False))
 (SD / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))

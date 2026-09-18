@@ -1,0 +1,70 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../utils/url';
+import zheng from '../../data/zhengxing.json';
+import diseases from '../../data/diseases.json';
+
+export function getStaticPaths() {
+  return zheng.map((z: any) => ({ params: { slug: z.slug }, props: { z } }));
+}
+const { z } = Astro.props;
+const dslug = Object.fromEntries(diseases.map((d: any) => [d.name, d.slug]));
+const relDiseases = (z.rel_diseases ?? []).map((n: string) => ({ name: n, slug: dslug[n] })).filter((d: any) => d.slug);
+const procList = (z.process ?? '').split(/[-–—]/).map((s: string) => s.trim()).filter(Boolean);
+---
+<Base title={z.name} desc={`${z.group} · 证候`}>
+  <div class="wrap">
+    <h1 class="page-title">{z.name}</h1>
+    <div class="d-meta" style="margin:-14px 0 30px">
+      <span class="chip red">{z.group}</span>
+      <span class="supp-tag">补充资料</span>
+    </div>
+
+    {z.linchuang && (
+      <section class="sec" style="margin-top:0">
+        <div class="sec-h">临床表现</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{z.linchuang}</div>
+      </section>
+    )}
+
+    {z.desc && (
+      <section class="sec" style={z.linchuang ? '' : 'margin-top:0'}>
+        <div class="sec-h">证候释义</div>
+        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{z.desc}</div>
+      </section>
+    )}
+
+    {procList.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">病机分析</div>
+        <div class="sec-bd">
+          <ol class="proc-list">
+            {procList.map((p: string) => <li>{p}</li>)}
+          </ol>
+        </div>
+      </section>
+    )}
+
+    {z.symptoms?.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">症状清单</div>
+        <div class="sec-bd rel-list">
+          {z.symptoms.map((s: string) => <a class="pill indic" href={u('/glossary#' + encodeURIComponent(s))}>{s}</a>)}
+        </div>
+      </section>
+    )}
+
+    {relDiseases.length > 0 && (
+      <section class="sec">
+        <div class="sec-h">相关病症</div>
+        <div class="sec-bd rel-list">
+          {relDiseases.map((d: any) => <a class="pill" href={u('/diseases/' + d.slug)}>{d.name}</a>)}
+        </div>
+      </section>
+    )}
+
+    <div class="feedback">本条内容有误？<a href={`https://github.com/Mathjk/fujian-tcm-kb/issues/new?title=${encodeURIComponent('[纠错] 证候：' + z.name)}&body=${encodeURIComponent('条目：' + z.full + '\n页面：/bianzheng/' + z.slug + '\n\n问题描述：')}`} target="_blank" rel="noopener">点此反馈</a></div>
+
+    <div style="margin:50px 0"><a href={u('/bianzheng')}>← 返回证候辨证</a></div>
+  </div>
+</Base>
