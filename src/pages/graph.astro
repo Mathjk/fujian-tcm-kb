@@ -146,8 +146,6 @@ import Base from '../layouts/Base.astro';
     }
 
     const degLabel = d => view.mode === 'ego' ? true : tier === 2 ? d.deg > 2 : d.deg > 8;
-    const usePic = n => view.mode === 'ego' ? (n.type === 'herb' && n.img)
-                                          : (tier === 2 && n.type === 'herb' && n.img && n.deg > 2);
 
     function memberSpec() {
       const vis = memberVisible();
@@ -177,9 +175,8 @@ import Base from '../layouts/Base.astro';
           id: n.id, name: n.name, slug: n.slug, type: n.type,
           img: n.img, xw: n.xw, fn: n.fn, fc: n.fc, top: n.top, cat: n.cat, deg: n.deg,
           x: px, y: py, fixed: true,
-          symbol: usePic(n) ? 'image://' + BASE + '/img/' + n.img : 'circle',
-          symbolSize: center ? 34 : usePic(n) ? Math.min(42, 18 + Math.sqrt(n.deg) * 5)
-                                            : Math.min(24, 6 + Math.sqrt(n.deg) * 2.2),
+          symbol: 'circle',
+          symbolSize: center ? 34 : Math.min(24, 6 + Math.sqrt(n.deg) * 2.2),
           symbolKeepAspect: true,
           itemStyle: {
             color: colorOf(n),
