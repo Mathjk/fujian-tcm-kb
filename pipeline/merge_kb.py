@@ -125,15 +125,30 @@ def main():
     diseases = {}
     formulas = []
 
+    # orthographic / OCR variants of the same drug -> fold into canonical entry.
+    # (verified pairs only: same species; homonyms like 大青/大青叶 excluded)
+    HERB_MERGE = {
+        "灯芯草": "灯心草", "罗布麻叶": "罗布麻",
+        "乌鼓莓": "乌蔹莓", "板兰根": "板蓝根", "稀签草": "豨莶草",
+        "蕺荣": "蕺菜", "铁苋荣": "铁苋菜", "狗肝荣": "狗肝菜",
+        "蝉退": "蝉蜕", "士牛膝根": "土牛膝", "土牛膝根": "土牛膝",
+        "川栋": "川栋子", "毬兰鲜叶": "毬兰", "天仙果根": "天仙果",
+        "野菊": "野菊花", "野菊叶": "野菊花",
+    }
+
     def get_herb(rawname):
         key = norm_name(rawname)
         if not key:
             return None
-        if key not in herbs:
-            herbs[key] = {"id": "h_" + key, "name": key, "aliases": [],
-                          "latin": "", "family": "", "category": "",
-                          "sources": [], "fields": {}, "treats": set()}
-        return herbs[key]
+        canon = HERB_MERGE.get(key, key)
+        if canon not in herbs:
+            herbs[canon] = {"id": "h_" + canon, "name": canon, "aliases": [],
+                            "latin": "", "family": "", "category": "",
+                            "sources": [], "fields": {}, "treats": set()}
+        h = herbs[canon]
+        if key != canon and key not in h["aliases"]:
+            h["aliases"].append(key)
+        return h
 
     def get_disease(rawname, cat=None):
         key = norm_name(rawname)
@@ -263,6 +278,7 @@ def main():
         for c in fm["composition"]:
             hit = None
             for cand in fold_herb_name(norm_name(c["herb"])):
+                cand = HERB_MERGE.get(cand, cand)
                 canon = alias2canon.get(cand, cand)
                 if canon in herbs:
                     hit = canon
@@ -282,19 +298,28 @@ def main():
                 unk[c["herb_norm"]] += 1
     stubbed = 0
     for tok, cnt in unk.items():
-        if cnt >= 3 and not NOISE_CHAR.search(tok):
-            h = {"id": "h_" + tok, "name": tok, "aliases": [], "latin": "",
+        ctok = HERB_MERGE.get(tok, tok)
+        h = None
+        if ctok in herbs:
+            h = herbs[ctok]
+            if tok != ctok and tok not in h["aliases"]:
+                h["aliases"].append(tok)
+        elif cnt >= 3 and not NOISE_CHAR.search(tok):
+            h = {"id": "h_" + ctok, "name": ctok,
+                 "aliases": [tok] if tok != ctok else [], "latin": "",
                  "family": "", "category": "", "sources": [], "fields": {},
                  "treats": set(), "stub": True, "ref_count": cnt}
-            herbs[tok] = h
+            herbs[ctok] = h
             stubbed += 1
-            # backfill edges: mark formulas' tokens known
-            for fm in formulas:
-                for c in fm["composition"]:
-                    if c["herb_norm"] == tok and not c.get("known"):
-                        c["known"] = True
-                        comp_hit += 1
-                        h["treats"].add(norm_name(fm["disease"]))
+        if h is None:
+            continue
+        # backfill edges: mark formulas' tokens known
+        for fm in formulas:
+            for c in fm["composition"]:
+                if c["herb_norm"] in (tok, ctok) and not c.get("known"):
+                    c["known"] = True
+                    comp_hit += 1
+                    h["treats"].add(norm_name(fm["disease"]))
 
     for h in herbs.values():
         h["treats"] = sorted(h["treats"])
