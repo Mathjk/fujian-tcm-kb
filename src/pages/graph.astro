@@ -68,14 +68,14 @@ import Base from '../layouts/Base.astro';
     function tip(p) {
       const d = p.data;
       if (d.agg) {
-        return `<div style="max-width:210px"><b style="font-size:15px">${esc(d.name)}</b>
+        return `<div style="max-width:210px;white-space:normal"><b style="font-size:15px">${esc(d.name)}</b>
           <div style="color:#57503f;font-size:12.5px;margin-top:3px">${d.count} 个条目 · ${d.edges} 条关联</div>
           <div style="color:#8a7f66;font-size:11px;margin-top:4px">单击展开此类别</div></div>`;
       }
       const url = `${BASE}${d.type === 'herb' ? '/herbs/' : '/diseases/'}${d.slug}`;
       if (d.type === 'herb') {
         const img = d.img ? `<img src="${BASE}/img/${d.img}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-bottom:6px">` : '';
-        return `<div style="max-width:240px">${img}
+        return `<div style="max-width:240px;white-space:normal">${img}
           <b style="font-size:15px">${esc(d.name)}</b>
           <span style="color:#8a7f66;font-size:12px"> · ${esc(d.cat || '草药')}</span><br/>
           ${d.xw ? `<div style="color:#57503f;font-size:12.5px;margin-top:2px"><b style="color:#a5823c">性味</b> ${esc(d.xw)}</div>` : ''}
@@ -83,7 +83,7 @@ import Base from '../layouts/Base.astro';
           <div style="margin-top:6px"><a href="${url}" style="color:#b23a24;font-size:12px">查看详情 →</a>
           <span style="color:#8a7f66;font-size:11px;margin-left:8px">${d.deg} 条关联 · 单击聚焦邻域</span></div></div>`;
       }
-      return `<div style="max-width:220px"><b style="font-size:15px">${esc(d.name)}</b>
+      return `<div style="max-width:220px;white-space:normal"><b style="font-size:15px">${esc(d.name)}</b>
         <span style="color:#8a7f66;font-size:12px"> · ${esc(d.cat || '病症')}</span><br/>
         <div style="color:#57503f;font-size:12.5px;margin-top:2px">验方 ${d.fc ?? 0} 首 · ${d.deg} 条关联</div>
         ${d.top?.length ? `<div style="color:#57503f;font-size:12px;margin-top:3px">常用药：${esc(d.top.join('、'))}</div>` : ''}
