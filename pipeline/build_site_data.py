@@ -266,6 +266,7 @@ for i, f in enumerate(kb["formulas"]):
         "efficacy": fl.get("疗效", ""),
         "source": fl.get("来源", ""),
         "note": fl.get("备注", "") or fl.get("附注", ""),
+        "pnum": f.get("pnum"),
         "composition": comp,
         "index": i,
     })

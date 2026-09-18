@@ -116,6 +116,10 @@ def extract_indications(ent):
 
 def main():
     ents = [json.loads(l) for l in open(ROOT / "entries.jsonl")]
+    try:
+        PMAP = json.load(open(ROOT / "page_map.json"))
+    except FileNotFoundError:
+        PMAP = {}
 
     herbs = {}
     diseases = {}
@@ -222,7 +226,8 @@ def main():
                 formulas.append({
                     "id": fid, "book": e["book"], "disease": d["name"],
                     "fields": fm["fields"], "composition": comp,
-                    "page": fm.get("page")})
+                    "page": fm.get("page"),
+                    "pnum": PMAP.get(e["book"], {}).get(fm.get("page"))})
                 d["formulas"].append(fid)
         for g in e.get("groups", []):   # chufang
             for it in g.get("items", []):
@@ -231,13 +236,15 @@ def main():
                 formulas.append({
                     "id": fid, "book": e["book"], "disease": d["name"],
                     "desc": g.get("desc", ""), "text": it["text"],
-                    "composition": comp})
+                    "composition": comp,
+                    "pnum": e.get("printed_page")})
                 d["formulas"].append(fid)
         for it in e.get("items", []):   # fj1 tail (vet/pesticide)
             fid = f'f_{len(formulas)}'
             formulas.append({"id": fid, "book": e["book"], "disease": d["name"],
                              "text": it.get("text", ""),
-                             "composition": split_composition(it.get("text", ""))})
+                             "composition": split_composition(it.get("text", "")),
+                             "pnum": PMAP.get(e["book"], {}).get((e.get("pages") or [None])[0])})
             d["formulas"].append(fid)
 
     # herb <- formula membership edges (disease<-herb implied via formula)

@@ -1,12 +1,12 @@
 ---
-import { u, BOOK_SHORT } from '../utils/url';
+import { u, BOOK_FULL } from '../utils/url';
 interface Props { f: any; num?: number; }
 const { f, num } = Astro.props;
 ---
 <div class="card fx-card" id={f.id}>
   <div class="fx-head">
     <span class="fx-name">{num != null ? `方 ${'①②③④⑤⑥⑦⑧⑨⑩'[num] ?? num + 1}` : (f.disease ? `${f.disease}方` : '验方')}</span>
-    {f.book && <span class="fx-src">{BOOK_SHORT[f.book] ?? f.book}</span>}
+    {f.book && <span class="fx-src">{BOOK_FULL[f.book] ?? f.book}{f.pnum ? ` 第${f.pnum}页` : ''}</span>}
     {f.source && <span class="fx-src">· {f.source}</span>}
   </div>
   {f.composition?.length > 0 && (
