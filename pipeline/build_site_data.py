@@ -481,7 +481,13 @@ if _zp.exists():
         else:
             group, name = "专科杂证", z
         rur = _ru.get(z, {})
-        syms = [s for s in re.split(r"[-*]", r.get("symptom") or rur.get("symptom") or "") if s]
+        raw_sym = re.sub(r"[A-Za-z]\d+", "-", r.get("symptom") or rur.get("symptom") or "")
+        syms = []
+        for s in re.split(r"[-*]", raw_sym):
+            s = re.split(r"【", s)[0]
+            s = re.sub(r"^[A-Za-z]+\d*", "", s).strip()
+            if s and s not in syms:
+                syms.append(s)
         text = name + (r.get("desc") or "") + (r.get("process") or "") + (rur.get("linchuang") or "")
         zheng_out.append({
             "name": name, "full": z, "group": group,
@@ -602,8 +608,10 @@ def _strip_wt(s):
 def _slot_list(r, prefix, n):
     out = []
     for i in range(n):
-        for s in re.split(r"[-*]", r.get(f"{prefix}{i:02d}") or ""):
-            s = _strip_wt(s)
+        raw = re.sub(r"[A-Za-z]\d+", "-", r.get(f"{prefix}{i:02d}") or "")
+        for s in re.split(r"[-*]", raw):
+            s = re.split(r"【", s)[0]
+            s = re.sub(r"^[A-Za-z]+\d*", "", s).strip()
             if s and s not in out:
                 out.append(s)
     return out
