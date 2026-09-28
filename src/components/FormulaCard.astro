@@ -15,8 +15,8 @@ const { f, num } = Astro.props;
       <div class="fx-comp">
         {f.composition.map((c: any) => (
           c.herb_id
-            ? <a class="fx-ing" href={u('/herbs/' + c.slug)}>{c.herb}<span class="dose">{c.dose}</span></a>
-            : <span class="fx-ing no" title="未收录为词条">{c.herb}<span class="dose">{c.dose}</span></span>
+            ? <a class="fx-ing" href={u('/herbs/' + c.slug)} title={c.dose || undefined}>{c.herb}</a>
+            : <span class="fx-ing no" title={c.dose ? c.dose + ' · 未收录为词条' : '未收录为词条'}>{c.herb}</span>
         ))}
       </div>
     </div>
