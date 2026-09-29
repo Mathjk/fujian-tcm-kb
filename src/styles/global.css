@@ -260,9 +260,9 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hi); border
 /* overview numbered items */
 .ov-bd { line-height: 1.95; color: var(--ink-2); }
 .ov-para { margin: 0 0 10px; }
-.ov-item { display: block; padding-left: 1.7em; text-indent: -1.7em; margin: 3px 0; }
+.ov-item { display: block; margin: 4px 0; }
 .fx-txt { display: inline; }
-.fx-li { display: block; padding-left: 1.7em; text-indent: -1.7em; margin: 2px 0; }
+.fx-li { display: block; margin: 3px 0; }
 
 
 .sec { margin-top: 26px; }
