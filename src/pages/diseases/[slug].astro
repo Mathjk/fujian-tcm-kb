@@ -22,6 +22,9 @@ const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
 // herbs that claim to treat this disease in their 功用/主治 text (not in formulas)
 const indicHerbs = (d.indic_herbs ?? []).map((s: any) => hslug[s]).filter(Boolean);
 const zname = Object.fromEntries(zhengxing.map((z: any) => [z.slug, z.name]));
+// 把段内连排的编号分点（（1）（2）…/①②…）拆为独立行
+const ITEM_MARK = /(?=[（(][0-9０-９一二三四五六七八九十]+[)）])|(?=[①②③④⑤⑥⑦⑧⑨⑩])/g;
+const splitItems = (t: string) => t.split(ITEM_MARK).map(s => s.trim()).filter(Boolean);
 ---
 <Base title={d.name} desc={`${d.category} · 验方 ${myFormulas.length} 首`}>
   <div class="wrap">
@@ -35,8 +38,13 @@ const zname = Object.fromEntries(zhengxing.map((z: any) => [z.slug, z.name]));
     {d.desc?.length > 0 && (
       <section class="sec" style="margin-top:0">
         <div class="sec-h">病症概述</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">
-          {d.desc.map((p: string) => <p style="margin:0 0 10px">{p}</p>)}
+        <div class="sec-bd ov-bd">
+          {d.desc.map((p: string) => {
+            const items = splitItems(p);
+            return items.length > 1
+              ? <div class="ov-para">{items.map((s: string) => <span class="ov-item">{s}</span>)}</div>
+              : <p class="ov-para">{p}</p>;
+          })}
         </div>
       </section>
     )}
@@ -80,7 +88,9 @@ const zname = Object.fromEntries(zhengxing.map((z: any) => [z.slug, z.name]));
     {d.trailing && (
       <section class="sec">
         <div class="sec-h">选配药 · 补充</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{d.trailing}</div>
+        <div class="sec-bd ov-bd">
+          {splitItems(d.trailing).map((s: string) => <span class="ov-item">{s}</span>)}
+        </div>
       </section>
     )}
 

@@ -310,6 +310,25 @@ for d in diseases_out:
 diseases_out = list(_dedup.values())
 did_of = {d["name"]: d["id"] for d in diseases_out}
 
+# desc/trailing 清洗：剔除混入的同级病名标题行、章标题碎片、段尾粘连的标题
+_dnames = set(d["name"] for d in diseases_out)
+_chap = re.compile(r"^[一二三四五六七八九十百]+[、．.].{0,12}$")
+_headish = re.compile(r"^[^，。；、：]{2,10}(咬伤|疾病|病|症|癌|炎|疗法|方法|中毒)$")
+for d in diseases_out:
+    clean = []
+    for p in d.get("desc", []):
+        if (p in _dnames and p != d["name"]) or _chap.match(p) or _headish.match(p):
+            continue
+        # 段尾粘连的同级标题，如「…撒疮口。五步蛇咬伤」
+        m = re.search(r"[。；]([^。；，、：]{2,9}(?:咬伤|疾病|中毒|疗法))$", p)
+        if m:
+            p = p[:m.start(1)]
+        if p.strip():
+            clean.append(p)
+    d["desc"] = clean
+    if _chap.match(d.get("trailing", "")) or d.get("trailing") in _dnames:
+        d["trailing"] = ""
+
 # ---------- formulas ----------
 formulas_out = []
 for i, f in enumerate(kb["formulas"]):

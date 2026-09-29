@@ -253,8 +253,16 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hi); border
 .gl-dlg { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; font-family: var(--kai); }
 
 .pill.plain { cursor: default; color: var(--ink-2); }
-.cy-card { display: block; text-decoration: none; color: inherit; }
-.cy-zheng { font-size: 11.5px; color: var(--gold); margin-top: 4px; }
+.cy-card { display: block; text-decoration: none; color: inherit; padding: 16px 18px; }
+.cy-card .gl-name { color: var(--pine-2); }
+.cy-zheng { font-size: 12px; color: var(--gold); margin-top: 7px; letter-spacing: .04em; }
+
+/* overview numbered items */
+.ov-bd { line-height: 1.95; color: var(--ink-2); }
+.ov-para { margin: 0 0 10px; }
+.ov-item { display: block; padding-left: 1.7em; text-indent: -1.7em; margin: 3px 0; }
+.fx-txt { display: inline; }
+.fx-li { display: block; padding-left: 1.7em; text-indent: -1.7em; margin: 2px 0; }
 
 
 .sec { margin-top: 26px; }
