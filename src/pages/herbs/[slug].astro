@@ -5,6 +5,7 @@ import { u, BOOK_SHORT } from '../../utils/url';
 import herbs from '../../data/herbs.json';
 import formulas from '../../data/formulas.json';
 import diseases from '../../data/diseases.json';
+import { splitItems } from '../../utils/text';
 
 export function getStaticPaths() {
   return herbs.map((h: any) => ({ params: { slug: h.slug }, props: { herb: h } }));
@@ -70,7 +71,7 @@ const bookCount = herb.books?.length ?? 0;
         <div class="sec-h">{s.label}</div>
         <div class="sec-bd">
           {Object.entries(s.texts).map(([bk, txt]: any) => (
-            <p>{Object.keys(s.texts).length > 1 && <span class="bk">{BOOK_SHORT[bk] ?? bk}</span>}{txt}</p>
+            <p class="ov-para">{Object.keys(s.texts).length > 1 && <span class="bk">{BOOK_SHORT[bk] ?? bk}</span>}{splitItems(txt).map((t2: string, i2: number, a2: string[]) => a2.length > 1 ? <span class="ov-item">{t2}</span> : t2)}</p>
           ))}
         </div>
       </section>
@@ -81,7 +82,7 @@ const bookCount = herb.books?.length ?? 0;
         <div class="sec-h">备考释义 <span class="supp-tag">补充资料</span></div>
         <div class="sec-bd supp-bd">
           {herb.zhushi.class && <div class="zhushi-class">{herb.zhushi.class}</div>}
-          <p style="margin:0">{herb.zhushi.desc}</p>
+          {splitItems(herb.zhushi.desc).map((t2: string, i2: number, a2: string[]) => a2.length > 1 ? <span class="ov-item">{t2}</span> : <p style="margin:0">{t2}</p>)}
         </div>
       </section>
     )}

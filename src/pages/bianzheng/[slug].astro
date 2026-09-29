@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import { u } from '../../utils/url';
 import zheng from '../../data/zhengxing.json';
+import { splitItems } from '../../utils/text';
 import diseases from '../../data/diseases.json';
 
 export function getStaticPaths() {
@@ -25,14 +26,14 @@ const procList = (z.process ?? '').split(/[-–—]/).map((s: string) => s.trim(
     {z.linchuang && (
       <section class="sec" style="margin-top:0">
         <div class="sec-h">临床表现</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{z.linchuang}</div>
+        <div class="sec-bd ov-bd">{splitItems(z.linchuang).map((s: string) => <span class="ov-item">{s}</span>)}</div>
       </section>
     )}
 
     {z.desc && (
       <section class="sec" style={z.linchuang ? '' : 'margin-top:0'}>
         <div class="sec-h">证候释义</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{z.desc}</div>
+        <div class="sec-bd ov-bd">{splitItems(z.desc).map((s: string) => <span class="ov-item">{s}</span>)}</div>
       </section>
     )}
 

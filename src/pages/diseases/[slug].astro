@@ -3,6 +3,7 @@ import Base from '../../layouts/Base.astro';
 import FormulaCard from '../../components/FormulaCard.astro';
 import { u } from '../../utils/url';
 import diseases from '../../data/diseases.json';
+import { splitItems } from '../../utils/text';
 import formulas from '../../data/formulas.json';
 import herbs from '../../data/herbs.json';
 import zhengxing from '../../data/zhengxing.json';
@@ -22,9 +23,7 @@ const relHerbs = herbIds.map((s: any) => hslug[s]).filter(Boolean);
 // herbs that claim to treat this disease in their 功用/主治 text (not in formulas)
 const indicHerbs = (d.indic_herbs ?? []).map((s: any) => hslug[s]).filter(Boolean);
 const zname = Object.fromEntries(zhengxing.map((z: any) => [z.slug, z.name]));
-// 把段内连排的编号分点（（1）（2）…/①②…）拆为独立行
-const ITEM_MARK = /(?=[（(][0-9０-９一二三四五六七八九十]+[)）])|(?=[①②③④⑤⑥⑦⑧⑨⑩])/g;
-const splitItems = (t: string) => t.split(ITEM_MARK).map(s => s.trim()).filter(Boolean);
+
 ---
 <Base title={d.name} desc={`${d.category} · 验方 ${myFormulas.length} 首`}>
   <div class="wrap">

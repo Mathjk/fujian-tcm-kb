@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import { u } from '../../utils/url';
 import patent from '../../data/patent.json';
+import { splitItems } from '../../utils/text';
 
 export function getStaticPaths() {
   return patent.map((p: any) => ({ params: { slug: p.slug }, props: { p } }));
@@ -24,7 +25,7 @@ const issueUrl = 'https://github.com/Mathjk/fujian-tcm-kb/issues/new?title='
     {p.func && (
       <section class="sec" style="margin-top:0">
         <div class="sec-h">功效主治</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{p.func}</div>
+        <div class="sec-bd ov-bd">{splitItems(p.func).map((s: string) => <span class="ov-item">{s}</span>)}</div>
       </section>
     )}
 
@@ -63,8 +64,8 @@ const issueUrl = 'https://github.com/Mathjk/fujian-tcm-kb/issues/new?title='
     {p.desc.length > 0 && (
       <section class="sec">
         <div class="sec-h">用药辨析</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">
-          {p.desc.map((t: string) => <p style="margin:0 0 10px">{t}</p>)}
+        <div class="sec-bd ov-bd">
+          {p.desc.map((t: string) => <div class="ov-para">{splitItems(t).map((s: string) => <span class="ov-item">{s}</span>)}</div>)}
         </div>
       </section>
     )}
@@ -72,8 +73,8 @@ const issueUrl = 'https://github.com/Mathjk/fujian-tcm-kb/issues/new?title='
     {p.jian.length > 0 && (
       <section class="sec">
         <div class="sec-h">常见情形</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">
-          {p.jian.map((t: string) => <p style="margin:0 0 8px">· {t}</p>)}
+        <div class="sec-bd ov-bd">
+          {p.jian.map((t: string) => <div class="ov-para">{splitItems(t).map((s: string) => <span class="ov-item">· {s}</span>)}</div>)}
         </div>
       </section>
     )}

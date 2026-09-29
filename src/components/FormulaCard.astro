@@ -1,9 +1,8 @@
 ---
 import { u, BOOK_FULL } from '../utils/url';
+import { splitItems } from '../utils/text';
 interface Props { f: any; num?: number; }
 const { f, num } = Astro.props;
-const ITEM_MARK = /(?=[（(][0-9０-９一二三四五六七八九十]+[)）])|(?=[①②③④⑤⑥⑦⑧⑨⑩])/g;
-const splitItems = (t: string) => t.split(ITEM_MARK).map(s => s.trim()).filter(Boolean);
 ---
 <div class="card fx-card" id={f.id}>
   <div class="fx-head">
@@ -23,7 +22,7 @@ const splitItems = (t: string) => t.split(ITEM_MARK).map(s => s.trim()).filter(B
       </div>
     </div>
   )}
-  {f.prescription && <div class="fx-row"><span class="label-tag">处方</span><span>{f.prescription}</span></div>}
+  {f.prescription && <div class="fx-row"><span class="label-tag">处方</span><span class="fx-txt">{splitItems(f.prescription).map((s: string, i: number, a: string[]) => a.length > 1 ? <span class="fx-li">{s}</span> : s)}</span></div>}
   {f.preparation && <div class="fx-row"><span class="label-tag">制法</span><span class="fx-txt">{splitItems(f.preparation).map((s: string, i: number, a: string[]) => a.length > 1 ? <span class="fx-li">{s}</span> : s)}</span></div>}
   {f.usage && <div class="fx-row"><span class="label-tag">用法</span><span class="fx-txt">{splitItems(f.usage).map((s: string, i: number, a: string[]) => a.length > 1 ? <span class="fx-li">{s}</span> : s)}</span></div>}
   {f.efficacy && <div class="fx-row"><span class="label-tag">疗效</span><span class="fx-txt">{splitItems(f.efficacy).map((s: string, i: number, a: string[]) => a.length > 1 ? <span class="fx-li">{s}</span> : s)}</span></div>}

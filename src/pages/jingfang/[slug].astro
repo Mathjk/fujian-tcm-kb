@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import { u } from '../../utils/url';
 import jingfang from '../../data/jingfang.json';
+import { splitItems } from '../../utils/text';
 
 export function getStaticPaths() {
   return jingfang.map((j: any) => ({ params: { slug: j.slug }, props: { j } }));
@@ -70,7 +71,7 @@ const fb = 'https://github.com/Mathjk/fujian-tcm-kb/issues/new?title='
     {j.medicine && (
       <section class="sec">
         <div class="sec-h">功效主治</div>
-        <div class="sec-bd" style="line-height:1.9;color:var(--ink-2)">{j.medicine}</div>
+        <div class="sec-bd ov-bd">{splitItems(j.medicine).map((s: string) => <span class="ov-item">{s}</span>)}</div>
       </section>
     )}
 
